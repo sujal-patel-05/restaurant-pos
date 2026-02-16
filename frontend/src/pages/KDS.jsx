@@ -115,14 +115,14 @@ function KDS() {
             </div>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+                <div style={{ textAlign: 'center', padding: '4rem' }}>
                     <div className="loader">Loading orders...</div>
                 </div>
             ) : filteredKots.length === 0 ? (
-                <div className="stat-card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
-                    <div style={{ fontSize: '4rem', marginBottom: 'var(--spacing-lg)' }}>👨‍🍳</div>
-                    <h2 style={{ marginBottom: 'var(--spacing-md)' }}>No Active Orders</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>
+                <div className="stat-card" style={{ textAlign: 'center', padding: '4rem' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>👨‍🍳</div>
+                    <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>No Active Orders</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
                         All caught up! New orders will appear here automatically.
                     </p>
                 </div>
@@ -130,61 +130,74 @@ function KDS() {
                 /* Orders Grid */
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                    gap: 'var(--spacing-xl)'
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+                    gap: '2rem'
                 }}>
                     {filteredKots.map(kot => (
                         <div
                             key={kot.id}
-                            className="stat-card"
+                            className="stat-card fade-in-up"
                             style={{
-                                borderLeft: `4px solid ${getStatusColor(kot.status)}`,
-                                transition: 'all var(--transition-base)'
+                                borderLeft: `5px solid ${getStatusColor(kot.status)}`,
+                                transition: 'all var(--transition-base)',
+                                padding: '1.75rem'
                             }}
                         >
                             {/* Order Header */}
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: 'var(--spacing-lg)',
-                                paddingBottom: 'var(--spacing-md)',
-                                borderBottom: '1px solid var(--border-light)'
+                                alignItems: 'flex-start',
+                                marginBottom: '1.5rem',
+                                paddingBottom: '1rem',
+                                borderBottom: '2px solid var(--border-color)'
                             }}>
                                 <div>
-                                    <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
                                         {kot.kot_number}
                                     </h3>
-                                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                                        Order #{kot.order?.order_number} • {new Date(kot.created_at).toLocaleTimeString()}
+                                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                        Order #{kot.order?.order_number} • {new Date(kot.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                     </p>
                                 </div>
-                                <div className={getStatusBadge(kot.status)} style={{ textTransform: 'capitalize' }}>
+                                <div className={getStatusBadge(kot.status)} style={{
+                                    textTransform: 'capitalize',
+                                    fontSize: '0.875rem',
+                                    padding: '0.5rem 1rem',
+                                    fontWeight: 600
+                                }}>
                                     {kot.status}
                                 </div>
                             </div>
 
                             {/* Order Items */}
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, marginBottom: 'var(--spacing-md)' }}>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-secondary)' }}>
                                     Items:
                                 </h4>
                                 {kot.order_item && (
                                     <div style={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
-                                        padding: 'var(--spacing-sm)',
+                                        alignItems: 'center',
+                                        padding: '1rem',
                                         background: 'var(--bg-main)',
-                                        borderRadius: 'var(--radius-md)',
-                                        marginBottom: 'var(--spacing-sm)'
+                                        borderRadius: '0.75rem',
+                                        marginBottom: '0.75rem',
+                                        border: '1px solid var(--border-color)'
                                     }}>
-                                        <span style={{ fontWeight: 500 }}>{kot.order_item.menu_item?.name || 'Unknown Item'}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-main)' }}>
+                                            {kot.order_item.menu_item?.name || 'Unknown Item'}
+                                        </span>
                                         <span style={{
-                                            background: 'var(--bg-white)',
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: 'var(--radius-sm)',
-                                            fontWeight: 600,
-                                            fontSize: 'var(--font-size-sm)'
+                                            background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                                            color: 'white',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '0.5rem',
+                                            fontWeight: 700,
+                                            fontSize: '1rem',
+                                            minWidth: '50px',
+                                            textAlign: 'center'
                                         }}>
                                             ×{kot.order_item.quantity}
                                         </span>
@@ -192,57 +205,78 @@ function KDS() {
                                 )}
                                 {kot.order_item?.special_instructions && (
                                     <div style={{
-                                        padding: 'var(--spacing-sm)',
-                                        background: '#FEF3C7',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-sm)',
-                                        marginTop: 'var(--spacing-sm)'
+                                        padding: '1rem',
+                                        background: 'rgba(251, 191, 36, 0.1)',
+                                        border: '1px solid rgba(251, 191, 36, 0.3)',
+                                        borderRadius: '0.75rem',
+                                        fontSize: '0.875rem',
+                                        marginTop: '0.75rem',
+                                        color: 'var(--text-main)'
                                     }}>
-                                        <strong>Note:</strong> {kot.order_item.special_instructions}
+                                        <strong style={{ color: '#F59E0B' }}>📝 Note:</strong> {kot.order_item.special_instructions}
                                     </div>
                                 )}
                             </div>
 
                             {/* Action Buttons */}
-                            <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 {kot.status === 'placed' && (
                                     <button
                                         onClick={() => updateStatus(kot.id, 'preparing')}
                                         className="btn btn-primary"
-                                        style={{ flex: 1 }}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.875rem',
+                                            fontSize: '1rem',
+                                            fontWeight: 600
+                                        }}
                                     >
-                                        Start Preparing
+                                        🔥 Start Preparing
                                     </button>
                                 )}
                                 {kot.status === 'preparing' && (
                                     <button
                                         onClick={() => updateStatus(kot.id, 'ready')}
                                         className="btn btn-primary"
-                                        style={{ flex: 1 }}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.875rem',
+                                            fontSize: '1rem',
+                                            fontWeight: 600,
+                                            background: 'linear-gradient(135deg, #3B82F6, #1E40AF)'
+                                        }}
                                     >
-                                        Mark Ready
+                                        ✅ Mark Ready
                                     </button>
                                 )}
                                 {kot.status === 'ready' && (
                                     <button
                                         onClick={() => updateStatus(kot.id, 'completed')}
                                         className="btn btn-primary"
-                                        style={{ flex: 1, background: 'var(--success)' }}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.875rem',
+                                            fontSize: '1rem',
+                                            fontWeight: 600,
+                                            background: 'linear-gradient(135deg, #10B981, #059669)'
+                                        }}
                                     >
-                                        Complete
+                                        🎉 Complete
                                     </button>
                                 )}
                                 {kot.status === 'completed' && (
                                     <div style={{
                                         flex: 1,
                                         textAlign: 'center',
-                                        padding: 'var(--spacing-md)',
-                                        color: 'var(--success)',
+                                        padding: '0.875rem',
+                                        color: '#10B981',
                                         fontWeight: 600,
-                                        background: 'var(--bg-main)',
-                                        borderRadius: 'var(--radius-md)'
+                                        fontSize: '1rem',
+                                        background: 'rgba(16, 185, 129, 0.1)',
+                                        border: '2px solid rgba(16, 185, 129, 0.3)',
+                                        borderRadius: '0.75rem'
                                     }}>
-                                        Completed
+                                        ✓ Completed
                                     </div>
                                 )}
                             </div>

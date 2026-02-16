@@ -145,124 +145,74 @@ function POSTerminal() {
                     <LoadingSpinner size="lg" />
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--spacing-xl)', height: 'calc(100vh - 180px)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '2rem', alignItems: 'start' }}>
                     {/* Menu Items */}
                     <div>
-                        {/* Order Type Selector */}
-                        <div className="mb-lg">
-                            <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-                                {['dine-in', 'takeaway', 'delivery'].map(type => (
-                                    <button
-                                        key={type}
-                                        onClick={() => setOrderType(type)}
-                                        className={`btn ${orderType === type ? 'btn-primary' : 'btn-secondary'}`}
-                                        style={{ textTransform: 'capitalize' }}
-                                    >
-                                        {type.replace('-', ' ')}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Table Number Input for Dine-In */}
-                            {orderType === 'dine-in' && (
-                                <div className="mb-lg fade-in" style={{
-                                    animation: 'fadeInUp 0.3s ease-out',
-                                    background: 'var(--bg-white)',
-                                    padding: 'var(--spacing-lg)',
-                                    borderRadius: 'var(--radius-lg)',
-                                    border: '1px solid var(--border-light)',
-                                    boxShadow: 'var(--shadow-sm)'
-                                }}>
-                                    <div style={{ position: 'relative' }}>
-                                        <label style={{
-                                            display: 'block',
-                                            marginBottom: 'var(--spacing-sm)',
-                                            fontWeight: 600,
-                                            color: 'var(--text-secondary)',
-                                            fontSize: 'var(--font-size-sm)',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em'
-                                        }}>
-                                            Table Number <span style={{ color: 'var(--error)' }}>*</span>
-                                        </label>
-                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                                            <span style={{
-                                                position: 'absolute',
-                                                left: '1rem',
-                                                fontSize: '1.25rem',
-                                                color: 'var(--primary)'
-                                            }}>🪑</span>
-                                            <input
-                                                type="text"
-                                                value={tableNumber}
-                                                onChange={(e) => setTableNumber(e.target.value)}
-                                                placeholder="e.g. T-12"
-                                                className="form-input"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.875rem 1rem 0.875rem 3rem',
-                                                    fontSize: 'var(--font-size-lg)',
-                                                    fontWeight: 600,
-                                                    color: 'var(--text-primary)',
-                                                    background: 'var(--bg-main)',
-                                                    border: '2px solid var(--border-light)',
-                                                    borderRadius: 'var(--radius-md)',
-                                                    transition: 'all 0.2s ease',
-                                                    outline: 'none'
-                                                }}
-                                                onFocus={(e) => {
-                                                    e.target.style.borderColor = 'var(--primary)';
-                                                    e.target.style.boxShadow = '0 0 0 3px rgba(246, 48, 73, 0.1)';
-                                                    e.target.style.background = 'var(--bg-white)';
-                                                }}
-                                                onBlur={(e) => {
-                                                    e.target.style.borderColor = 'var(--border-light)';
-                                                    e.target.style.boxShadow = 'none';
-                                                    e.target.style.background = 'var(--bg-main)';
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Category Filter */}
-                            {categories.length > 0 && (
-                                <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-                                    <button
-                                        onClick={() => setSelectedCategory(null)}
-                                        className={`btn ${!selectedCategory ? 'btn-primary' : 'btn-secondary'}`}
-                                    >
-                                        All Items
-                                    </button>
-                                    {categories.map(cat => (
+                        {/* Order Type & Filters */}
+                        <div className="stat-card mb-xl">
+                            <div className="flex justify-between items-center" style={{ gap: '1rem', flexWrap: 'wrap' }}>
+                                {/* Order Type */}
+                                <div className="flex gap-md">
+                                    {['dine-in', 'takeaway', 'delivery'].map(type => (
                                         <button
-                                            key={cat.id}
-                                            onClick={() => setSelectedCategory(cat.id)}
-                                            className={`btn ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
+                                            key={type}
+                                            onClick={() => setOrderType(type)}
+                                            className={`btn ${orderType === type ? 'btn-primary' : 'btn-secondary'}`}
+                                            style={{ textTransform: 'capitalize' }}
                                         >
-                                            {cat.name}
+                                            {type.replace('-', ' ')}
                                         </button>
                                     ))}
+                                </div>
+
+                                {/* Categories */}
+                                {categories.length > 0 && (
+                                    <div className="flex gap-md" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+                                        <button
+                                            onClick={() => setSelectedCategory(null)}
+                                            className={`btn ${!selectedCategory ? 'btn-primary' : 'btn-secondary'}`}
+                                        >
+                                            All
+                                        </button>
+                                        {categories.map(cat => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => setSelectedCategory(cat.id)}
+                                                className={`btn ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
+                                            >
+                                                {cat.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Table Number Input */}
+                            {orderType === 'dine-in' && (
+                                <div className="fade-in-up" style={{ marginTop: '1.5rem', maxWidth: '300px' }}>
+                                    <label className="form-label">
+                                        Table Number <span style={{ color: 'var(--error)' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={tableNumber}
+                                        onChange={(e) => setTableNumber(e.target.value)}
+                                        placeholder="e.g. T-12"
+                                        className="form-input"
+                                    />
                                 </div>
                             )}
                         </div>
 
                         {/* Menu Grid */}
                         {filteredItems.length === 0 ? (
-                            <div className="stat-card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+                            <div className="stat-card" style={{ textAlign: 'center', padding: '3rem' }}>
                                 <p style={{ color: 'var(--text-secondary)' }}>
-                                    No menu items available. Please add items in Menu Management.
+                                    No menu items found.
                                 </p>
                             </div>
                         ) : (
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                gap: 'var(--spacing-lg)',
-                                overflowY: 'auto',
-                                maxHeight: 'calc(100vh - 350px)'
-                            }}>
+                            <div className="modules-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
                                 {filteredItems.map(item => (
                                     <div
                                         key={item.id}
@@ -270,102 +220,91 @@ function POSTerminal() {
                                         className="module-card"
                                         style={{
                                             cursor: item.is_available ? 'pointer' : 'not-allowed',
-                                            padding: 'var(--spacing-lg)',
-                                            opacity: item.is_available ? 1 : 0.5
+                                            opacity: item.is_available ? 1 : 0.6
                                         }}
                                     >
-                                        <div className="badge badge-success" style={{ marginBottom: 'var(--spacing-md)' }}>
-                                            {categories.find(c => c.id === item.category_id)?.name || 'Uncategorized'}
-                                        </div>
-                                        <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-sm)' }}>
-                                            {item.name}
-                                        </h3>
-                                        {item.description && (
-                                            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--spacing-sm)' }}>
-                                                {item.description}
-                                            </p>
-                                        )}
-                                        <p style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, color: 'var(--primary)' }}>
-                                            ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </p>
-                                        {!item.is_available && (
-                                            <div className="badge badge-error" style={{ marginTop: 'var(--spacing-sm)' }}>
-                                                Out of Stock
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
+                                            <div className="badge" style={{
+                                                fontSize: '0.7rem',
+                                                background: 'rgba(99, 102, 241, 0.1)',
+                                                color: 'var(--primary)',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px'
+                                            }}>
+                                                {categories.find(c => c.id === item.category_id)?.name || 'Item'}
                                             </div>
-                                        )}
+                                            {!item.is_available && (
+                                                <div className="badge" style={{ background: 'var(--error-bg)', color: 'var(--error)' }}>
+                                                    Out
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <h3 className="module-card-title" style={{ fontSize: '1rem' }}>{item.name}</h3>
+                                        <p className="module-card-description" style={{ marginBottom: '1rem' }}>
+                                            {item.description || 'No description'}
+                                        </p>
+
+                                        <div style={{ marginTop: 'auto', fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                            ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Cart */}
+                    {/* Sticky Cart */}
                     <div className="stat-card" style={{
+                        position: 'sticky',
+                        top: '1rem',
+                        height: 'calc(100vh - 140px)',
                         display: 'flex',
                         flexDirection: 'column',
-                        height: 'fit-content',
-                        position: 'sticky',
-                        top: 0,
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
-                        boxShadow: 'var(--shadow-xl)'
+                        padding: '0'
                     }}>
-                        <h2 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)' }}>
-                            Current Order
-                        </h2>
+                        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Current Order</h2>
+                        </div>
 
-                        {/* Cart Items */}
-                        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 'var(--spacing-lg)', maxHeight: '400px' }}>
+                        {/* Cart Items List */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                             {cart.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                                    <div style={{ fontSize: '3rem', marginBottom: 'var(--spacing-md)' }}>🛒</div>
-                                    <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                                        Cart is empty
-                                    </p>
+                                <div style={{ textAlign: 'center', padding: '2rem 0', opacity: 0.5 }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛒</div>
+                                    <p>Cart is empty</p>
                                 </div>
                             ) : (
                                 cart.map(item => (
-                                    <div
-                                        key={item.id}
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            padding: 'var(--spacing-md)',
-                                            borderBottom: '1px solid var(--border-light)',
-                                        }}
-                                    >
-                                        <div style={{ flex: 1 }}>
+                                    <div key={item.id} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: '1rem',
+                                        paddingBottom: '1rem',
+                                        borderBottom: '1px solid var(--border-color)'
+                                    }}>
+                                        <div>
                                             <div style={{ fontWeight: 600 }}>{item.name}</div>
-                                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                                                ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                ₹{item.price} x {item.quantity}
                                             </div>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                                        <div className="flex items-center gap-md">
                                             <button
                                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                                 className="btn btn-secondary"
-                                                style={{ padding: '0.25rem 0.75rem' }}
+                                                style={{ padding: '0.25rem 0.6rem', height: '28px' }}
                                             >
                                                 -
                                             </button>
-                                            <span style={{ fontWeight: 600, minWidth: '20px', textAlign: 'center' }}>
-                                                {item.quantity}
-                                            </span>
+                                            <span style={{ fontWeight: 600, width: '20px', textAlign: 'center' }}>{item.quantity}</span>
                                             <button
                                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                                 className="btn btn-secondary"
-                                                style={{ padding: '0.25rem 0.75rem' }}
+                                                style={{ padding: '0.25rem 0.6rem', height: '28px' }}
                                             >
                                                 +
-                                            </button>
-                                            <button
-                                                onClick={() => removeFromCart(item.id)}
-                                                className="btn btn-secondary"
-                                                style={{ padding: '0.25rem 0.75rem', color: 'var(--error)' }}
-                                            >
-                                                ×
                                             </button>
                                         </div>
                                     </div>
@@ -373,21 +312,21 @@ function POSTerminal() {
                             )}
                         </div>
 
-                        {/* Total */}
-                        <div style={{ borderTop: '2px solid var(--border-medium)', paddingTop: 'var(--spacing-lg)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
-                                <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>Total</span>
-                                <span style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--primary)' }}>
-                                    ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {/* Cart Footer */}
+                        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-body)' }}>
+                            <div className="flex justify-between" style={{ marginBottom: '1rem' }}>
+                                <span style={{ fontWeight: 600 }}>Total</span>
+                                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                    ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <button
                                 onClick={placeOrder}
                                 className="btn btn-primary"
-                                style={{ width: '100%', padding: 'var(--spacing-lg)' }}
+                                style={{ width: '100%' }}
                                 disabled={cart.length === 0}
                             >
-                                Place Order
+                                Place Order (₹{total})
                             </button>
                         </div>
                     </div>

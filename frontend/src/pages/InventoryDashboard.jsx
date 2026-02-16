@@ -16,8 +16,7 @@ function InventoryDashboard() {
         current_stock: '',
         reorder_level: '',
         cost_per_unit: '',
-        supplier_name: '',
-        storage_location: ''
+        supplier: ''
     });
 
     useEffect(() => {
@@ -49,7 +48,8 @@ function InventoryDashboard() {
                 ...ingredientForm,
                 current_stock: parseFloat(ingredientForm.current_stock),
                 reorder_level: parseFloat(ingredientForm.reorder_level),
-                cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0
+                cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0,
+                supplier: ingredientForm.supplier
             };
 
             await inventoryAPI.createIngredient(data);
@@ -70,7 +70,8 @@ function InventoryDashboard() {
                 ...ingredientForm,
                 current_stock: parseFloat(ingredientForm.current_stock),
                 reorder_level: parseFloat(ingredientForm.reorder_level),
-                cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0
+                cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0,
+                supplier: ingredientForm.supplier
             };
 
             await inventoryAPI.updateIngredient(editingItem.id, data);
@@ -93,8 +94,7 @@ function InventoryDashboard() {
             current_stock: ingredient.current_stock.toString(),
             reorder_level: ingredient.reorder_level.toString(),
             cost_per_unit: ingredient.cost_per_unit?.toString() || '0',
-            supplier_name: ingredient.supplier_name || '',
-            storage_location: ingredient.storage_location || ''
+            supplier: ingredient.supplier || ''
         });
         setShowEditModal(true);
     };
@@ -121,8 +121,7 @@ function InventoryDashboard() {
             current_stock: '',
             reorder_level: '',
             cost_per_unit: '',
-            supplier_name: '',
-            storage_location: ''
+            supplier: ''
         });
     };
 
@@ -150,27 +149,29 @@ function InventoryDashboard() {
             actions={actions}
         >
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
-                    <div className="loader">Loading inventory...</div>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+                    <div className="loader"></div>
                 </div>
             ) : (
                 <>
                     {/* Alerts */}
                     {lowStockAlerts.length > 0 && (
-                        <div className="mb-xl" style={{
-                            background: '#FEF3C7',
-                            border: '1px solid #F59E0B',
+                        <div className="fade-in-up" style={{
+                            marginBottom: '2rem',
+                            background: 'var(--warning-bg)',
+                            border: '1px solid var(--warning)',
                             borderRadius: 'var(--radius-lg)',
-                            padding: 'var(--spacing-lg)',
+                            padding: '1rem 1.5rem',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 'var(--spacing-md)'
+                            gap: '1rem',
+                            color: '#92400E'
                         }}>
                             <span style={{ fontSize: '1.5rem' }}>⚠️</span>
                             <div>
-                                <strong>Low Stock Alert:</strong> {lowStockAlerts.length} item(s) need reordering
-                                <div style={{ fontSize: 'var(--font-size-sm)', marginTop: '0.25rem' }}>
-                                    {lowStockAlerts.slice(0, 3).map(alert => alert.ingredient_name).join(', ')}
+                                <strong style={{ fontWeight: 600 }}>Low Stock Alert:</strong> {lowStockAlerts.length} item(s) need reordering
+                                <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', opacity: 0.9 }}>
+                                    {lowStockAlerts.slice(0, 3).map(alert => alert.name).join(', ')}
                                     {lowStockAlerts.length > 3 && ` and ${lowStockAlerts.length - 3} more`}
                                 </div>
                             </div>
@@ -179,95 +180,102 @@ function InventoryDashboard() {
 
                     {/* Stats */}
                     <div className="stats-grid mb-xl">
-                        <div className="stat-card">
-                            <div className="stat-card-header">
-                                <div className="stat-card-icon green">📦</div>
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '0ms' }}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="stat-card-label">Total Items</div>
+                                    <div className="stat-card-value">{ingredients.length}</div>
+                                </div>
+                                <div className="stat-card-icon green" style={{ marginBottom: 0 }}>📦</div>
                             </div>
-                            <div className="stat-card-value">{ingredients.length}</div>
-                            <div className="stat-card-label">Total Ingredients</div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-card-header">
-                                <div className="stat-card-icon orange">⚠️</div>
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '100ms' }}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="stat-card-label">Low Stock</div>
+                                    <div className="stat-card-value">{lowStockAlerts.length}</div>
+                                </div>
+                                <div className="stat-card-icon orange" style={{ marginBottom: 0 }}>⚠️</div>
                             </div>
-                            <div className="stat-card-value">{lowStockAlerts.length}</div>
-                            <div className="stat-card-label">Low Stock Items</div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-card-header">
-                                <div className="stat-card-icon blue">💰</div>
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '200ms' }}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="stat-card-label">Total Value</div>
+                                    <div className="stat-card-value">
+                                        ₹{inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                                <div className="stat-card-icon blue" style={{ marginBottom: 0 }}>💰</div>
                             </div>
-                            <div className="stat-card-value">₹{inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div className="stat-card-label">Inventory Value</div>
                         </div>
                     </div>
 
                     {/* Inventory Table */}
                     {ingredients.length === 0 ? (
-                        <div className="stat-card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
-                            <div style={{ fontSize: '4rem', marginBottom: 'var(--spacing-lg)' }}>📦</div>
-                            <h2 style={{ marginBottom: 'var(--spacing-md)' }}>No Ingredients Yet</h2>
-                            <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--spacing-xl)' }}>
+                        <div className="stat-card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                            <div style={{ fontSize: '4rem', marginBottom: '1.5rem', opacity: 0.5 }}>📦</div>
+                            <h2 style={{ marginBottom: '0.5rem', fontSize: '1.5rem', fontWeight: 700 }}>No Ingredients Yet</h2>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
                                 Start by adding your first ingredient to track inventory
                             </p>
                             <button className="btn btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>
-                                <span>➕</span>
-                                Add First Ingredient
+                                <span>➕</span> Add First Ingredient
                             </button>
                         </div>
                     ) : (
-                        <div className="stat-card">
-                            <h2 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)' }}>
-                                Ingredient Stock
-                            </h2>
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '300ms', padding: '0', overflow: 'hidden' }}>
+                            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                                <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Ingredient Stock</h2>
+                            </div>
+                            <div className="table-container" style={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+                                <table className="modern-table">
                                     <thead>
-                                        <tr style={{ borderBottom: '2px solid var(--border-medium)' }}>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Ingredient</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Current Stock</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Unit</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Reorder Level</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Cost/Unit</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Supplier</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Status</th>
-                                            <th style={{ padding: 'var(--spacing-md)', textAlign: 'left', fontWeight: 600 }}>Actions</th>
+                                        <tr>
+                                            <th>Ingredient</th>
+                                            <th>Current Stock</th>
+                                            <th>Unit</th>
+                                            <th>Reorder Level</th>
+                                            <th>Cost/Unit</th>
+                                            <th>Supplier</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {ingredients.map(item => {
                                             const isLowStock = item.current_stock <= item.reorder_level;
                                             return (
-                                                <tr key={item.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                                    <td style={{ padding: 'var(--spacing-md)', fontWeight: 500 }}>{item.name}</td>
-                                                    <td style={{ padding: 'var(--spacing-md)', fontWeight: 600 }}>
+                                                <tr key={item.id}>
+                                                    <td style={{ fontWeight: 500 }}>{item.name}</td>
+                                                    <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                                                         {item.current_stock.toFixed(2)}
                                                     </td>
-                                                    <td style={{ padding: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>{item.unit}</td>
-                                                    <td style={{ padding: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>{item.reorder_level}</td>
-                                                    <td style={{ padding: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
-                                                        ₹{item.cost_per_unit ? parseFloat(item.cost_per_unit).toFixed(2) : 'N/A'}
+                                                    <td style={{ color: 'var(--text-secondary)' }}>{item.unit}</td>
+                                                    <td style={{ color: 'var(--text-secondary)' }}>{item.reorder_level}</td>
+                                                    <td style={{ fontFamily: 'var(--font-mono)' }}>
+                                                        ₹{item.cost_per_unit ? parseFloat(item.cost_per_unit).toFixed(2) : '0.00'}
                                                     </td>
-                                                    <td style={{ padding: 'var(--spacing-md)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                                                        {item.supplier_name || '-'}
+                                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                                        {item.supplier || '-'}
                                                     </td>
-                                                    <td style={{ padding: 'var(--spacing-md)' }}>
-                                                        <span className={isLowStock ? 'badge-warning' : 'badge-success'}>
+                                                    <td>
+                                                        <span className={`badge ${isLowStock ? 'badge-warning' : 'badge-success'}`}>
                                                             {isLowStock ? 'Low Stock' : 'In Stock'}
                                                         </span>
                                                     </td>
-                                                    <td style={{ padding: 'var(--spacing-md)' }}>
-                                                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                             <button
                                                                 className="btn btn-secondary"
-                                                                style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-size-sm)' }}
+                                                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                                                                 onClick={() => openEditModal(item)}
                                                             >
                                                                 Edit
                                                             </button>
                                                             <button
                                                                 className="btn btn-secondary"
-                                                                style={{ padding: '0.5rem 1rem', fontSize: 'var(--font-size-sm)', color: 'var(--error)' }}
+                                                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', color: 'var(--error)', borderColor: 'var(--error-bg)' }}
                                                                 onClick={() => handleDeleteIngredient(item.id, item.name)}
                                                             >
                                                                 Delete
@@ -287,79 +295,45 @@ function InventoryDashboard() {
 
             {/* Add Ingredient Modal */}
             {showAddModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    overflowY: 'auto',
-                    padding: 'var(--spacing-xl)'
-                }}>
-                    <div className="stat-card" style={{ width: '600px', maxWidth: '90%' }}>
-                        <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>Add Ingredient</h2>
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}>
+                    <div className="modal-content" style={{ maxWidth: '600px' }}>
+                        <div className="flex justify-between items-center mb-xl">
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Add Ingredient</h2>
+                            <button onClick={() => setShowAddModal(false)} className="btn btn-secondary" style={{ padding: '0.5rem', border: 'none' }}>✕</button>
+                        </div>
                         <form onSubmit={handleCreateIngredient}>
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Ingredient Name *
-                                </label>
+                            <div className="form-group">
+                                <label className="form-label">Ingredient Name *</label>
                                 <input
                                     type="text"
                                     required
+                                    className="form-input"
                                     value={ingredientForm.name}
                                     onChange={(e) => setIngredientForm({ ...ingredientForm, name: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
-                                    placeholder="e.g., Tomatoes, Cheese, Flour"
+                                    placeholder="e.g., Tomatoes, Cheese"
                                 />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Current Stock *
-                                    </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Current Stock *</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         required
+                                        className="form-input"
                                         value={ingredientForm.current_stock}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, current_stock: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
-                                        placeholder="100"
+                                        placeholder="0.00"
                                     />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Unit *
-                                    </label>
+                                <div className="form-group">
+                                    <label className="form-label">Unit *</label>
                                     <select
                                         required
+                                        className="form-select"
                                         value={ingredientForm.unit}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, unit: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
                                     >
                                         <option value="kg">Kilograms (kg)</option>
                                         <option value="g">Grams (g)</option>
@@ -371,91 +345,50 @@ function InventoryDashboard() {
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Reorder Level *
-                                    </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Reorder Level *</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         required
+                                        className="form-input"
                                         value={ingredientForm.reorder_level}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, reorder_level: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
-                                        placeholder="20"
+                                        placeholder="10.00"
                                     />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Cost per Unit (₹)
-                                    </label>
+                                <div className="form-group">
+                                    <label className="form-label">Cost per Unit (₹)</label>
                                     <input
                                         type="number"
                                         step="0.01"
+                                        className="form-input"
                                         value={ingredientForm.cost_per_unit}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, cost_per_unit: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
-                                        placeholder="5.50"
+                                        placeholder="0.00"
                                     />
                                 </div>
                             </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Supplier Name
-                                </label>
+                            <div className="form-group mb-xl">
+                                <label className="form-label">Supplier Name</label>
                                 <input
                                     type="text"
-                                    value={ingredientForm.supplier_name}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier_name: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
+                                    className="form-input"
+                                    value={ingredientForm.supplier}
+                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
                                     placeholder="e.g., ABC Suppliers"
                                 />
                             </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Storage Location
-                                </label>
-                                <input
-                                    type="text"
-                                    value={ingredientForm.storage_location}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, storage_location: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
-                                    placeholder="e.g., Freezer A, Shelf 3"
-                                />
-                            </div>
 
-                            <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
-                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowAddModal(false)}>
+
+                            <div className="flex gap-md" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                <button type="submit" className="btn btn-primary">
                                     Add Ingredient
                                 </button>
                             </div>
@@ -466,77 +399,43 @@ function InventoryDashboard() {
 
             {/* Edit Ingredient Modal */}
             {showEditModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    overflowY: 'auto',
-                    padding: 'var(--spacing-xl)'
-                }}>
-                    <div className="stat-card" style={{ width: '600px', maxWidth: '90%' }}>
-                        <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>Edit Ingredient</h2>
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false); }}>
+                    <div className="modal-content" style={{ maxWidth: '600px' }}>
+                        <div className="flex justify-between items-center mb-xl">
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Edit Ingredient</h2>
+                            <button onClick={() => setShowEditModal(false)} className="btn btn-secondary" style={{ padding: '0.5rem', border: 'none' }}>✕</button>
+                        </div>
                         <form onSubmit={handleUpdateIngredient}>
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Ingredient Name *
-                                </label>
+                            <div className="form-group">
+                                <label className="form-label">Ingredient Name *</label>
                                 <input
                                     type="text"
                                     required
+                                    className="form-input"
                                     value={ingredientForm.name}
                                     onChange={(e) => setIngredientForm({ ...ingredientForm, name: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
                                 />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Current Stock *
-                                    </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Current Stock *</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         required
+                                        className="form-input"
                                         value={ingredientForm.current_stock}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, current_stock: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
                                     />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Unit *
-                                    </label>
+                                <div className="form-group">
+                                    <label className="form-label">Unit *</label>
                                     <select
                                         required
+                                        className="form-select"
                                         value={ingredientForm.unit}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, unit: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
                                     >
                                         <option value="kg">Kilograms (kg)</option>
                                         <option value="g">Grams (g)</option>
@@ -548,87 +447,47 @@ function InventoryDashboard() {
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Reorder Level *
-                                    </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Reorder Level *</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         required
+                                        className="form-input"
                                         value={ingredientForm.reorder_level}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, reorder_level: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
                                     />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Cost per Unit (₹)
-                                    </label>
+                                <div className="form-group">
+                                    <label className="form-label">Cost per Unit (₹)</label>
                                     <input
                                         type="number"
                                         step="0.01"
+                                        className="form-input"
                                         value={ingredientForm.cost_per_unit}
                                         onChange={(e) => setIngredientForm({ ...ingredientForm, cost_per_unit: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
                                     />
                                 </div>
                             </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Supplier Name
-                                </label>
+                            <div className="form-group mb-xl">
+                                <label className="form-label">Supplier Name</label>
                                 <input
                                     type="text"
-                                    value={ingredientForm.supplier_name}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier_name: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
+                                    className="form-input"
+                                    value={ingredientForm.supplier}
+                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
                                 />
                             </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Storage Location
-                                </label>
-                                <input
-                                    type="text"
-                                    value={ingredientForm.storage_location}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, storage_location: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
-                                />
-                            </div>
 
-                            <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
-                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setShowEditModal(false); setEditingItem(null); }}>
+
+                            <div className="flex gap-md" style={{ justifyContent: 'flex-end' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditModal(false); setEditingItem(null); }}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                <button type="submit" className="btn btn-primary">
                                     Update Ingredient
                                 </button>
                             </div>

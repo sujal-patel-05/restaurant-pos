@@ -44,28 +44,37 @@ function Login() {
     };
 
     return (
-        <div className="flex items-center justify-center" style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-            <div className="card" style={{ maxWidth: '450px', width: '100%' }}>
-                <div className="text-center" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                    <h1 style={{ color: 'var(--primary-accent)', marginBottom: 'var(--spacing-sm)' }}>
+        <div className="flex items-center justify-center" style={{ minHeight: '100vh', background: 'var(--bg-body)' }}>
+            <div className="stat-card fade-in-up" style={{ maxWidth: '400px', width: '100%', padding: '2.5rem' }}>
+                <div className="text-center" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🍽️</div>
+                    <h1 style={{ color: 'var(--primary)', marginBottom: '0.5rem', fontSize: '1.75rem', fontWeight: 700 }}>
                         SujalPOS
                     </h1>
-                    <p className="text-secondary">Production-Grade Point of Sale System</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>Production-Grade Point of Sale</p>
                 </div>
 
                 {error && (
-                    <div className="alert alert-error">
+                    <div style={{
+                        background: 'var(--error-bg)',
+                        color: 'var(--error)',
+                        padding: '0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        marginBottom: '1.5rem',
+                        fontSize: '0.9rem',
+                        textAlign: 'center'
+                    }}>
                         {error}
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <label className="input-label">Username</label>
+                    <div className="form-group">
+                        <label className="form-label">Username</label>
                         <input
                             type="text"
                             name="username"
-                            className="input"
+                            className="form-input"
                             value={formData.username}
                             onChange={handleChange}
                             required
@@ -75,12 +84,12 @@ function Login() {
 
                     {!isLogin && (
                         <>
-                            <div className="input-group">
-                                <label className="input-label">Email</label>
+                            <div className="form-group">
+                                <label className="form-label">Email</label>
                                 <input
                                     type="email"
                                     name="email"
-                                    className="input"
+                                    className="form-input"
                                     value={formData.email}
                                     onChange={handleChange}
                                     required
@@ -88,24 +97,24 @@ function Login() {
                                 />
                             </div>
 
-                            <div className="input-group">
-                                <label className="input-label">Full Name</label>
+                            <div className="form-group">
+                                <label className="form-label">Full Name</label>
                                 <input
                                     type="text"
                                     name="full_name"
-                                    className="input"
+                                    className="form-input"
                                     value={formData.full_name}
                                     onChange={handleChange}
                                     placeholder="Enter full name"
                                 />
                             </div>
 
-                            <div className="input-group">
-                                <label className="input-label">Restaurant ID</label>
+                            <div className="form-group">
+                                <label className="form-label">Restaurant ID</label>
                                 <input
                                     type="text"
                                     name="restaurant_id"
-                                    className="input"
+                                    className="form-input"
                                     value={formData.restaurant_id}
                                     onChange={handleChange}
                                     required
@@ -115,12 +124,12 @@ function Login() {
                         </>
                     )}
 
-                    <div className="input-group">
-                        <label className="input-label">Password</label>
+                    <div className="form-group">
+                        <label className="form-label">Password</label>
                         <input
                             type="password"
                             name="password"
-                            className="input"
+                            className="form-input"
                             value={formData.password}
                             onChange={handleChange}
                             required
@@ -131,20 +140,26 @@ function Login() {
                     <button
                         type="submit"
                         className="btn btn-primary"
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', marginTop: '1rem', padding: '0.875rem' }}
                         disabled={loading}
                     >
-                        {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
+                        {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                     </button>
                 </form>
 
-                <div className="text-center" style={{ marginTop: 'var(--spacing-lg)' }}>
+                <div style={{ marginTop: '2rem', textAlign: 'center' }}>
                     <button
                         onClick={() => setIsLogin(!isLogin)}
-                        className="btn btn-outline"
-                        style={{ width: '100%' }}
+                        className="btn"
+                        style={{
+                            background: 'transparent',
+                            color: 'var(--primary)',
+                            border: 'none',
+                            fontSize: '0.9rem',
+                            textDecoration: 'none'
+                        }}
                     >
-                        {isLogin ? 'Need an account? Register' : 'Already have an account? Login'}
+                        {isLogin ? "Don't have an account? Register" : 'Already have an account? Login'}
                     </button>
                 </div>
             </div>

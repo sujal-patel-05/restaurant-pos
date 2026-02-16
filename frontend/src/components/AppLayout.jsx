@@ -42,6 +42,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
                         <span>SujalPOS</span>
                     </div>
                 </div>
+
                 <nav className="sidebar-nav">
                     {navItems.map((item) => (
                         <Link
@@ -56,8 +57,27 @@ export function AppLayout({ children, title, subtitle, actions }) {
                     ))}
                 </nav>
 
-                {/* Sidebar Footer with Toggle */}
                 <div className="sidebar-footer">
+                    <button
+                        className="nav-item"
+                        onClick={() => {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            window.location.href = '/login';
+                        }}
+                        title="Logout"
+                        style={{
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: 'var(--text-secondary)',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <span className="nav-item-icon">🚪</span>
+                        <span>Logout</span>
+                    </button>
                     <button
                         className="sidebar-toggle"
                         onClick={toggleSidebar}
@@ -89,7 +109,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
             </main>
 
             {/* Floating AI Chat Widget */}
-            <AIChatWidget />
+            {/* <AIChatWidget /> */}
         </div>
     );
 }

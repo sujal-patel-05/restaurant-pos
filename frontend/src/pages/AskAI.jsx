@@ -89,51 +89,62 @@ function AskAI() {
             title="Ask AI"
             subtitle="Your intelligent POS assistant"
         >
-            <div style={{
+            <div className="stat-card" style={{
                 display: 'flex',
                 flexDirection: 'column',
-                height: 'calc(100vh - 180px)',
-                background: 'var(--bg-white)',
-                borderRadius: 'var(--radius-xl)',
-                boxShadow: 'var(--shadow-lg)',
-                overflow: 'hidden'
+                height: 'calc(100vh - 200px)',
+                overflow: 'hidden',
+                padding: 0
             }}>
                 {/* Messages Area */}
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: 'var(--spacing-xl)',
+                    padding: '2rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 'var(--spacing-lg)'
+                    gap: '1rem',
+                    background: 'linear-gradient(180deg, var(--card-bg) 0%, var(--bg-main) 100%)'
                 }}>
                     {messages.map((msg, index) => (
                         <div
                             key={index}
+                            className="fade-in-up"
                             style={{
                                 display: 'flex',
-                                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
+                                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                animationDelay: `${index * 50}ms`
                             }}
                         >
                             <div style={{
-                                maxWidth: '70%',
-                                padding: 'var(--spacing-md) var(--spacing-lg)',
-                                borderRadius: 'var(--radius-lg)',
+                                maxWidth: '75%',
+                                padding: '1rem 1.25rem',
+                                borderRadius: '1rem',
                                 background: msg.role === 'user'
-                                    ? 'linear-gradient(135deg, var(--primary), var(--primary-dark))'
-                                    : 'var(--bg-main)',
-                                color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
-                                boxShadow: 'var(--shadow-sm)',
+                                    ? 'linear-gradient(135deg, #6366F1, #8B5CF6)'
+                                    : 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: msg.role === 'assistant' ? 'blur(10px)' : 'none',
+                                border: msg.role === 'assistant' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                                color: msg.role === 'user' ? 'white' : 'var(--text-main)',
+                                boxShadow: msg.role === 'user'
+                                    ? '0 4px 12px rgba(99, 102, 241, 0.3)'
+                                    : '0 4px 12px rgba(0, 0, 0, 0.1)',
                                 whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word'
+                                wordBreak: 'break-word',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.6'
                             }}>
                                 {msg.content}
                                 <div style={{
-                                    fontSize: 'var(--font-size-xs)',
-                                    marginTop: 'var(--spacing-sm)',
-                                    opacity: 0.7
+                                    fontSize: '0.75rem',
+                                    marginTop: '0.5rem',
+                                    opacity: 0.7,
+                                    fontWeight: 500
                                 }}>
-                                    {new Date(msg.timestamp).toLocaleTimeString()}
+                                    {new Date(msg.timestamp).toLocaleTimeString('en-IN', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -141,12 +152,25 @@ function AskAI() {
                     {loading && (
                         <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                             <div style={{
-                                padding: 'var(--spacing-md) var(--spacing-lg)',
-                                borderRadius: 'var(--radius-lg)',
-                                background: 'var(--bg-main)',
-                                boxShadow: 'var(--shadow-sm)'
+                                padding: '1rem 1.25rem',
+                                borderRadius: '1rem',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
                             }}>
-                                <span className="loading-dots">Thinking</span>
+                                <div className="loading-spinner" style={{
+                                    width: '16px',
+                                    height: '16px',
+                                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                                    borderTopColor: '#6366F1',
+                                    borderRadius: '50%',
+                                    animation: 'spin 0.8s linear infinite'
+                                }}></div>
+                                <span style={{ color: 'var(--text-secondary)' }}>Thinking...</span>
                             </div>
                         </div>
                     )}
@@ -156,19 +180,30 @@ function AskAI() {
                 {/* Quick Questions */}
                 {messages.length === 1 && (
                     <div style={{
-                        padding: 'var(--spacing-md) var(--spacing-xl)',
-                        borderTop: '1px solid var(--border-light)',
-                        background: 'var(--bg-main)'
+                        padding: '1rem 2rem',
+                        borderTop: '1px solid var(--border-color)',
+                        background: 'var(--card-bg)'
                     }}>
-                        <div style={{ fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-sm)', color: 'var(--text-secondary)' }}>
+                        <div style={{
+                            fontSize: '0.875rem',
+                            marginBottom: '0.75rem',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 600
+                        }}>
                             Quick questions:
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             {quickQuestions.map((q, i) => (
                                 <button
                                     key={i}
                                     onClick={() => handleQuickQuestion(q)}
-                                    className="btn btn-sm btn-secondary"
+                                    className="btn btn-secondary"
+                                    style={{
+                                        fontSize: '0.875rem',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '0.5rem',
+                                        transition: 'all 0.2s ease'
+                                    }}
                                 >
                                     {q}
                                 </button>
@@ -179,11 +214,12 @@ function AskAI() {
 
                 {/* Input Area */}
                 <div style={{
-                    padding: 'var(--spacing-lg) var(--spacing-xl)',
-                    borderTop: '2px solid var(--border-light)',
-                    background: 'var(--bg-white)'
+                    padding: '1.5rem 2rem',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--card-bg)',
+                    backdropFilter: 'blur(10px)'
                 }}>
-                    <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <input
                             type="text"
                             value={inputMessage}
@@ -193,9 +229,13 @@ function AskAI() {
                             className="input"
                             style={{
                                 flex: 1,
-                                padding: 'var(--spacing-md) var(--spacing-lg)',
-                                fontSize: 'var(--font-size-md)',
-                                borderRadius: 'var(--radius-lg)'
+                                padding: '0.875rem 1.25rem',
+                                fontSize: '0.95rem',
+                                borderRadius: '0.75rem',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-main)',
+                                color: 'var(--text-main)',
+                                transition: 'all 0.2s ease'
                             }}
                             disabled={loading}
                         />
@@ -204,26 +244,56 @@ function AskAI() {
                             className="btn btn-primary"
                             disabled={loading || !inputMessage.trim()}
                             style={{
-                                padding: 'var(--spacing-md) var(--spacing-xl)',
-                                minWidth: '100px'
+                                padding: '0.875rem 2rem',
+                                minWidth: '100px',
+                                borderRadius: '0.75rem',
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                transition: 'all 0.2s ease'
                             }}
                         >
-                            {loading ? '...' : 'Send'}
+                            {loading ? (
+                                <>
+                                    <div className="loading-spinner" style={{
+                                        width: '14px',
+                                        height: '14px',
+                                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                                        borderTopColor: 'white',
+                                        borderRadius: '50%',
+                                        animation: 'spin 0.8s linear infinite'
+                                    }}></div>
+                                    Sending
+                                </>
+                            ) : (
+                                <>
+                                    <span>Send</span>
+                                    <span>→</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Loading dots animation */}
+            {/* Animations */}
             <style>{`
-                .loading-dots::after {
-                    content: '...';
-                    animation: dots 1.5s steps(4, end) infinite;
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
-                @keyframes dots {
-                    0%, 20% { content: '.'; }
-                    40% { content: '..'; }
-                    60%, 100% { content: '...'; }
+                
+                .input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+                }
+                
+                .btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
             `}</style>
         </AppLayout>

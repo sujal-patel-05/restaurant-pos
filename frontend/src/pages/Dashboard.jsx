@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -13,6 +14,11 @@ function Dashboard() {
         ordersTrend: 0,
         menuItems: 0,
         activeStaff: 0
+    });
+    const [chartData, setChartData] = useState({
+        revenueTrend: [],
+        topItems: [],
+        orderStatus: []
     });
     const [loading, setLoading] = useState(true);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -35,16 +41,35 @@ function Dashboard() {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/api/reports/dashboard-stats');
+            const [statsRes, chartsRes] = await Promise.all([
+                api.get('/api/reports/dashboard-stats'),
+                api.get('/api/reports/dashboard-charts')
+            ]);
 
-            if (response.data) {
+            if (statsRes.data) {
                 setStats({
-                    totalRevenue: response.data.total_revenue || 0,
-                    revenueTrend: response.data.revenue_trend || 0,
-                    totalOrders: response.data.total_orders || 0,
-                    ordersTrend: response.data.orders_trend || 0,
-                    menuItems: response.data.menu_items || 0,
-                    activeStaff: response.data.active_staff || 0
+                    totalRevenue: statsRes.data.total_revenue || 0,
+                    revenueTrend: statsRes.data.revenue_trend || 0,
+                    totalOrders: statsRes.data.total_orders || 0,
+                    ordersTrend: statsRes.data.orders_trend || 0,
+                    menuItems: statsRes.data.menu_items || 0,
+                    activeStaff: statsRes.data.active_staff || 0
+                });
+            }
+
+            if (chartsRes.data) {
+                // Format order status for pie chart
+                const statusData = Object.entries(chartsRes.data.order_status || {})
+                    .filter(([key, value]) => key !== 'cancelled' && value > 0)
+                    .map(([key, value]) => ({
+                        name: key.charAt(0).toUpperCase() + key.slice(1),
+                        value: value
+                    }));
+
+                setChartData({
+                    revenueTrend: chartsRes.data.revenue_trend || [],
+                    topItems: chartsRes.data.top_items || [],
+                    orderStatus: statusData
                 });
             }
         } catch (error) {
@@ -148,6 +173,9 @@ function Dashboard() {
         },
     ];
 
+    // Chart colors
+    const COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
+
     return (
         <div className="app-container">
             {/* Sidebar */}
@@ -164,6 +192,7 @@ function Dashboard() {
                             key={item.path}
                             to={item.path}
                             className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                            title={item.label}
                         >
                             <span className="nav-item-icon">{item.icon}</span>
                             <span>{item.label}</span>
@@ -171,8 +200,28 @@ function Dashboard() {
                     ))}
                 </nav>
 
-                {/* Sidebar Footer with Toggle */}
+                {/* Sidebar Footer with Logout and Toggle */}
                 <div className="sidebar-footer">
+                    <button
+                        className="nav-item"
+                        onClick={() => {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            window.location.href = '/login';
+                        }}
+                        title="Logout"
+                        style={{
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: 'var(--text-secondary)',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <span className="nav-item-icon">🚪</span>
+                        <span>Logout</span>
+                    </button>
                     <button
                         className="sidebar-toggle"
                         onClick={toggleSidebar}
@@ -189,7 +238,7 @@ function Dashboard() {
                 <div className="top-bar">
                     <div>
                         <h1 className="page-title">Dashboard</h1>
-                        <p className="page-subtitle">Welcome back! Here's what's happening today.</p>
+                        <p className="page-subtitle">Overview of your business performance</p>
                     </div>
                     <div className="flex items-center gap-md">
                         <ThemeToggle />
@@ -197,8 +246,7 @@ function Dashboard() {
                             <span>🔄</span>
                         </button>
                         <Link to="/pos" className="btn btn-primary">
-                            <span>➕</span>
-                            New Order
+                            <span>➕</span> New Order
                         </Link>
                     </div>
                 </div>
@@ -217,38 +265,175 @@ function Dashboard() {
                     ) : (
                         <>
                             {/* Stats Grid */}
-                            <div className="stats-grid">
+                            <div className="stats-grid" style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                                gap: '1.5rem',
+                                marginBottom: '2rem'
+                            }}>
                                 {statCards.map((stat, index) => (
                                     <div
                                         key={index}
                                         className="stat-card fade-in-up"
                                         style={{ animationDelay: `${index * 100}ms` }}
                                     >
-                                        <div className="stat-card-header">
-                                            <div className={`stat-card-icon ${stat.colorClass}`}>
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <div className="stat-card-label">{stat.label}</div>
+                                                <div className="stat-card-value">{stat.value}</div>
+                                            </div>
+                                            <div className={`stat-card-icon ${stat.colorClass}`} style={{ marginBottom: 0 }}>
                                                 {stat.icon}
                                             </div>
                                         </div>
-                                        <div className="stat-card-value">{stat.value}</div>
-                                        <div className="stat-card-label">{stat.label}</div>
+
                                         <div className={`stat-card-trend ${stat.trendUp ? 'up' : 'down'}`}>
                                             <span>{stat.trendUp ? '↑' : '↓'}</span>
-                                            <span>{stat.trend} {stat.trendLabel}</span>
+                                            <span>{stat.trend}</span>
+                                            <span style={{ fontWeight: 400, opacity: 0.8, marginLeft: '4px' }}>{stat.trendLabel}</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
+                            {/* Charts Section */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
+                                gap: '1.5rem',
+                                marginBottom: '2rem'
+                            }}>
+                                {/* Revenue Trend Chart */}
+                                <div className="stat-card fade-in-up" style={{ animationDelay: '400ms', padding: '1.5rem' }}>
+                                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+                                        Revenue Trend (Last 7 Days)
+                                    </h2>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <AreaChart data={chartData.revenueTrend}>
+                                            <defs>
+                                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8} />
+                                                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="var(--text-secondary)"
+                                                tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                                tickFormatter={(value) => new Date(value).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                                            />
+                                            <YAxis
+                                                stroke="var(--text-secondary)"
+                                                tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                                tickFormatter={(value) => `₹${value.toLocaleString()}`}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'var(--card-bg)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-main)'
+                                                }}
+                                                formatter={(value) => [`₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 'Revenue']}
+                                                labelFormatter={(label) => new Date(label).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="revenue"
+                                                stroke="#6366F1"
+                                                strokeWidth={2}
+                                                fillOpacity={1}
+                                                fill="url(#colorRevenue)"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                {/* Top Selling Items Chart */}
+                                <div className="stat-card fade-in-up" style={{ animationDelay: '500ms', padding: '1.5rem' }}>
+                                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+                                        Top Selling Items
+                                    </h2>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={chartData.topItems} layout="vertical">
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                            <XAxis
+                                                type="number"
+                                                stroke="var(--text-secondary)"
+                                                tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                            />
+                                            <YAxis
+                                                type="category"
+                                                dataKey="name"
+                                                stroke="var(--text-secondary)"
+                                                tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                                width={120}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'var(--card-bg)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-main)'
+                                                }}
+                                                formatter={(value, name) => [
+                                                    name === 'quantity' ? `${value} sold` : `₹${value.toLocaleString('en-IN')}`,
+                                                    name === 'quantity' ? 'Quantity' : 'Revenue'
+                                                ]}
+                                            />
+                                            <Bar dataKey="quantity" radius={[0, 8, 8, 0]}>
+                                                {chartData.topItems.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                {/* Order Status Breakdown */}
+                                {chartData.orderStatus.length > 0 && (
+                                    <div className="stat-card fade-in-up" style={{ animationDelay: '600ms', padding: '1.5rem' }}>
+                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+                                            Today's Order Status
+                                        </h2>
+                                        <ResponsiveContainer width="100%" height={300}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={chartData.orderStatus}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={100}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                >
+                                                    {chartData.orderStatus.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'var(--card-bg)',
+                                                        border: '1px solid var(--border-color)',
+                                                        borderRadius: '8px',
+                                                        color: 'var(--text-main)'
+                                                    }}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Quick Actions Section */}
                             <div className="mb-xl">
                                 <h2 style={{
-                                    marginBottom: 'var(--spacing-xl)',
-                                    fontSize: 'var(--font-size-3xl)',
+                                    marginBottom: '1.5rem',
+                                    fontSize: '1.25rem',
                                     fontWeight: 700,
-                                    background: 'linear-gradient(135deg, var(--text-primary), var(--text-secondary))',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
+                                    color: 'var(--text-main)'
                                 }}>
                                     Quick Access
                                 </h2>
@@ -258,7 +443,7 @@ function Dashboard() {
                                             key={index}
                                             to={module.path}
                                             className="module-card fade-in-up"
-                                            style={{ animationDelay: `${(index + 4) * 100}ms` }}
+                                            style={{ animationDelay: `${(index + 7) * 100}ms` }}
                                         >
                                             <div className="module-card-icon" style={{ background: module.gradient }}>
                                                 {module.icon}

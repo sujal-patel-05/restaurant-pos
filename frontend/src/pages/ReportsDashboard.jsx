@@ -84,72 +84,77 @@ function ReportsDashboard() {
             actions={actions}
         >
             {/* Summary Cards */}
-            <div className="stats-grid">
-                <div className="stat-card">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon green">
-                            <span>₹</span>
+            <div className="stats-grid mb-xl">
+                <div className="stat-card fade-in-up" style={{ animationDelay: '0ms' }}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="stat-card-label">Total Revenue</div>
+                            <div className="stat-card-value">₹{stats.sales?.total_sales?.toLocaleString() || 0}</div>
                         </div>
-                        <div className="stat-card-trend up">
-                            <span>+12.5%</span>
-                            <span>↗</span>
-                        </div>
+                        <div className="stat-card-icon green" style={{ marginBottom: 0 }}>₹</div>
                     </div>
-                    <div className="stat-card-value">₹{stats.sales?.total_sales?.toLocaleString() || 0}</div>
-                    <div className="stat-card-label">Total Revenue</div>
+                    <div className="stat-card-trend up">
+                        <span>↑</span>
+                        <span>12.5%</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>vs last period</span>
+                    </div>
                 </div>
 
-                <div className="stat-card">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon blue">
-                            <span>📦</span>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '100ms' }}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="stat-card-label">Total Orders</div>
+                            <div className="stat-card-value">{stats.sales?.total_orders || 0}</div>
                         </div>
-                        <div className="stat-card-trend up">
-                            <span>+5.2%</span>
-                            <span>↗</span>
-                        </div>
+                        <div className="stat-card-icon blue" style={{ marginBottom: 0 }}>📦</div>
                     </div>
-                    <div className="stat-card-value">{stats.sales?.total_orders || 0}</div>
-                    <div className="stat-card-label">Total Orders</div>
+                    <div className="stat-card-trend up">
+                        <span>↑</span>
+                        <span>5.2%</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>vs last period</span>
+                    </div>
                 </div>
 
-                <div className="stat-card">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon orange">
-                            <span>💎</span>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '200ms' }}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="stat-card-label">Avg Order Value</div>
+                            <div className="stat-card-value">₹{Math.round(stats.sales?.average_order_value || 0)}</div>
                         </div>
-                        <div className="stat-card-trend down">
-                            <span>-2.1%</span>
-                            <span>↘</span>
-                        </div>
+                        <div className="stat-card-icon orange" style={{ marginBottom: 0 }}>💎</div>
                     </div>
-                    <div className="stat-card-value">₹{Math.round(stats.sales?.average_order_value || 0)}</div>
-                    <div className="stat-card-label">Average Order Value</div>
+                    <div className="stat-card-trend down">
+                        <span>↓</span>
+                        <span>2.1%</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8 }}>vs last period</span>
+                    </div>
                 </div>
 
-                <div className="stat-card">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon" style={{ background: '#FEE2E2', color: '#EF4444' }}>
-                            <span>🗑️</span>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '300ms' }}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="stat-card-label">Total Wastage</div>
+                            <div className="stat-card-value" style={{ color: 'var(--error)' }}>
+                                ₹{stats.wastage?.total_wastage_cost?.toLocaleString() || 0}
+                            </div>
                         </div>
-                        <div className="stat-card-trend down" style={{ color: '#EF4444', background: 'rgba(239, 68, 68, 0.1)' }}>
-                            <span>High Alert</span>
-                        </div>
+                        <div className="stat-card-icon" style={{ background: 'var(--error-bg)', color: 'var(--error)', marginBottom: 0 }}>🗑️</div>
                     </div>
-                    <div className="stat-card-value">₹{stats.wastage?.total_wastage_cost?.toLocaleString() || 0}</div>
-                    <div className="stat-card-label">Total Wastage Cost</div>
+                    <div className="stat-card-trend down" style={{ background: 'var(--error-bg)', color: 'var(--error)' }}>
+                        <span>Alert</span>
+                    </div>
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: 'var(--spacing-xl)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '2rem' }}>
 
                 {/* Top Selling Items */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)' }}>
-                    <h3 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)', fontWeight: '700' }}>Top Selling Items</h3>
-                    <div style={{ height: '350px' }}>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '400ms', padding: '1.5rem', height: '100%' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 700 }}>Top Selling Items</h3>
+                    <div style={{ height: '350px', width: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.items.slice(0, 5)} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                            <BarChart data={stats.items.slice(0, 5)} layout="vertical" margin={{ left: 0, right: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" opacity={0.3} />
                                 <XAxis type="number" hide />
                                 <YAxis
                                     dataKey="item_name"
@@ -160,18 +165,17 @@ function ReportsDashboard() {
                                     tickLine={false}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'transparent' }}
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
                                     contentStyle={{
-                                        backgroundColor: 'var(--bg-white)',
+                                        backgroundColor: 'var(--bg-surface)',
+                                        border: '1px solid var(--border-color)',
                                         borderRadius: 'var(--radius-lg)',
-                                        border: 'none',
-                                        boxShadow: 'var(--shadow-xl)',
-                                        padding: '12px'
+                                        boxShadow: 'var(--shadow-lg)'
                                     }}
                                 />
-                                <Bar dataKey="quantity_sold" fill="url(#colorGradient)" radius={[0, 8, 8, 0]} barSize={32}>
+                                <Bar dataKey="quantity_sold" radius={[0, 6, 6, 0]} barSize={24}>
                                     {stats.items.slice(0, 5).map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={[`#F63049`, `#3B82F6`, `#10B981`, `#F59E0B`, `#8B5CF6`][index % 5]} />
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -180,18 +184,18 @@ function ReportsDashboard() {
                 </div>
 
                 {/* Peak Hours */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)' }}>
-                    <h3 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)', fontWeight: '700' }}>Peak Hours</h3>
-                    <div style={{ height: '350px' }}>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '500ms', padding: '1.5rem', height: '100%' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 700 }}>Peak Hours</h3>
+                    <div style={{ height: '350px', width: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.peakHours}>
+                            <BarChart data={stats.peakHours} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#F63049" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#F63049" stopOpacity={0.2} />
+                                        <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" opacity={0.3} />
                                 <XAxis
                                     dataKey="hour"
                                     tickFormatter={(hour) => `${hour}:00`}
@@ -202,28 +206,27 @@ function ReportsDashboard() {
                                 />
                                 <YAxis hide />
                                 <Tooltip
-                                    cursor={{ fill: 'var(--bg-main)' }}
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
                                     contentStyle={{
-                                        backgroundColor: 'var(--bg-white)',
+                                        backgroundColor: 'var(--bg-surface)',
+                                        border: '1px solid var(--border-color)',
                                         borderRadius: 'var(--radius-lg)',
-                                        border: 'none',
-                                        boxShadow: 'var(--shadow-xl)',
-                                        padding: '12px'
+                                        boxShadow: 'var(--shadow-lg)'
                                     }}
                                 />
-                                <Bar dataKey="order_count" fill="url(#barGradient)" radius={[8, 8, 0, 0]} barSize={40} />
+                                <Bar dataKey="order_count" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={40} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Ingredient Usage */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)' }}>
-                    <h3 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)', fontWeight: '700' }}>Ingredient Usage (Top 5)</h3>
-                    <div style={{ height: '350px' }}>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '600ms', padding: '1.5rem', height: '100%' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 700 }}>Ingredient Usage (Top 5)</h3>
+                    <div style={{ height: '350px', width: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.ingredients.slice(0, 5)} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                            <BarChart data={stats.ingredients.slice(0, 5)} layout="vertical" margin={{ left: 0, right: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" opacity={0.3} />
                                 <XAxis type="number" hide />
                                 <YAxis
                                     dataKey="ingredient_name"
@@ -234,25 +237,24 @@ function ReportsDashboard() {
                                     tickLine={false}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'transparent' }}
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
                                     contentStyle={{
-                                        backgroundColor: 'var(--bg-white)',
+                                        backgroundColor: 'var(--bg-surface)',
+                                        border: '1px solid var(--border-color)',
                                         borderRadius: 'var(--radius-lg)',
-                                        border: 'none',
-                                        boxShadow: 'var(--shadow-xl)',
-                                        padding: '12px'
+                                        boxShadow: 'var(--shadow-lg)'
                                     }}
                                 />
-                                <Bar dataKey="total_used" fill="#8B5CF6" radius={[0, 8, 8, 0]} barSize={24} name="Units Used" />
+                                <Bar dataKey="total_used" fill="#8B5CF6" radius={[0, 6, 6, 0]} barSize={24} name="Units Used" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Wastage Breakdown */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)' }}>
-                    <h3 style={{ marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-xl)', fontWeight: '700' }}>Wastage Cost Analysis</h3>
-                    <div style={{ height: '350px' }}>
+                <div className="stat-card fade-in-up" style={{ animationDelay: '700ms', padding: '1.5rem', height: '100%' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 700 }}>Wastage Cost Analysis</h3>
+                    <div style={{ height: '350px', width: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             {stats.wastage && stats.wastage.wastage_details.length > 0 ? (
                                 <PieChart>
@@ -273,18 +275,18 @@ function ReportsDashboard() {
                                     </Pie>
                                     <Tooltip
                                         contentStyle={{
-                                            backgroundColor: 'var(--bg-white)',
+                                            backgroundColor: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-color)',
                                             borderRadius: 'var(--radius-lg)',
-                                            border: 'none',
-                                            boxShadow: 'var(--shadow-xl)',
-                                            padding: '12px'
+                                            boxShadow: 'var(--shadow-lg)'
                                         }}
                                     />
-                                    <Legend />
+                                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                 </PieChart>
                             ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
-                                    No wastage recorded
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ fontSize: '2rem', opacity: 0.5 }}>✨</div>
+                                    <div>No wastage recorded in this period</div>
                                 </div>
                             )}
                         </ResponsiveContainer>
@@ -293,7 +295,7 @@ function ReportsDashboard() {
             </div>
         </AppLayout>
     );
-
 }
+
 
 export default ReportsDashboard;

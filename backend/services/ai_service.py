@@ -38,13 +38,22 @@ class AIService:
     
     def classify_intent(self, message: str) -> Intent:
         """
-        Classify user intent using Local LLM (with rule-based fallback)
-        Returns Intent object with type, confidence, and extracted entities
+        Classify user intent using Hybrid Approach (Rule-Based + Local LLM)
+        Prioritizes Rule-Based for speed, falls back to LLM for complexity
         """
         
-        # Try LLM first
+        # 1. Try Rule-Based Classification FIRST (Instant)
+        intent = self._rule_based_classification(message)
+        
+        # 2. If Rule-Based found a specific intent (not general), return it
+        if intent.intent_type != 'general' and intent.confidence > 0.6:
+            print(f"✅ Rule-based match: {intent.intent_type}")
+            return intent
+            
+        # 3. If Rule-Based failed or returned general, try LLM (Llama 2)
         if self.use_llm and self.llm_service:
             try:
+                print("⚠️ Rule-based failed, trying LLM...")
                 intent_data = self.llm_service.classify_intent_with_llm(message)
                 if intent_data:
                     return Intent(
@@ -54,10 +63,9 @@ class AIService:
                         needs_data=intent_data.get('needs_data', False)
                     )
             except Exception as e:
-                print(f"LLM classification failed, using rule-based: {e}")
+                print(f"LLM classification failed: {e}")
         
-        # Fallback to rule-based classification
-        return self._rule_based_classification(message)
+        return intent
     
     def _rule_based_classification(self, message: str) -> Intent:
         """Rule-based intent classification (fallback)"""

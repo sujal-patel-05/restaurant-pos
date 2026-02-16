@@ -83,6 +83,104 @@ class ReportService:
         }
 
     @staticmethod
+    def get_dashboard_charts(db: Session, restaurant_id: UUID) -> Dict:
+        """
+        Get dashboard chart data for visualizations
+        """
+        # Revenue trend for last 7 days
+        revenue_trend = []
+        orders_trend = []
+        today = datetime.utcnow().date()
+        
+        for i in range(6, -1, -1):
+            date = today - timedelta(days=i)
+            day_start = datetime.combine(date, datetime.min.time())
+            day_end = datetime.combine(date, datetime.max.time())
+            
+            day_orders = db.query(Order).filter(
+                Order.restaurant_id == restaurant_id,
+                Order.created_at >= day_start,
+                Order.created_at <= day_end,
+                Order.status != "cancelled"
+            ).all()
+            
+            day_revenue = sum(order.total_amount for order in day_orders)
+            day_count = len(day_orders)
+            
+            revenue_trend.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "revenue": float(day_revenue)
+            })
+            
+            orders_trend.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "count": day_count
+            })
+        
+        # Top 5 selling items (last 7 days)
+        week_start = datetime.combine(today - timedelta(days=7), datetime.min.time())
+        
+        top_items_query = db.query(
+            MenuItem.name,
+            func.sum(OrderItem.quantity).label('total_quantity'),
+            func.sum(OrderItem.quantity * OrderItem.unit_price).label('total_revenue')
+        ).join(
+            OrderItem, MenuItem.id == OrderItem.menu_item_id
+        ).join(
+            Order, OrderItem.order_id == Order.id
+        ).filter(
+            Order.restaurant_id == restaurant_id,
+            Order.created_at >= week_start,
+            Order.status != "cancelled"
+        ).group_by(
+            MenuItem.id, MenuItem.name
+        ).order_by(
+            func.sum(OrderItem.quantity).desc()
+        ).limit(5).all()
+        
+        top_items = [
+            {
+                "name": item.name,
+                "quantity": int(item.total_quantity),
+                "revenue": float(item.total_revenue)
+            }
+            for item in top_items_query
+        ]
+        
+        # Order status breakdown (today)
+        today_start = datetime.combine(today, datetime.min.time())
+        today_end = datetime.combine(today, datetime.max.time())
+        
+        status_counts = db.query(
+            Order.status,
+            func.count(Order.id).label('count')
+        ).filter(
+            Order.restaurant_id == restaurant_id,
+            Order.created_at >= today_start,
+            Order.created_at <= today_end
+        ).group_by(Order.status).all()
+        
+        order_status = {
+            "placed": 0,
+            "preparing": 0,
+            "ready": 0,
+            "served": 0,
+            "completed": 0,
+            "cancelled": 0
+        }
+        
+        for status, count in status_counts:
+            if status in order_status:
+                order_status[status] = count
+        
+        return {
+            "revenue_trend": revenue_trend,
+            "orders_trend": orders_trend,
+            "top_items": top_items,
+            "order_status": order_status
+        }
+
+    @staticmethod
     def get_sales_report(
         db: Session,
         restaurant_id: UUID,

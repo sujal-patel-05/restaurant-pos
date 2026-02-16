@@ -121,7 +121,46 @@ function MenuManagement() {
                 quantity: bom.quantity_required
             })) : []
         });
+        // Clear image state when editing
+        setImageFile(null);
+        setImagePreview(null);
         setShowItemModal(true);
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const uploadImage = async (itemId) => {
+        if (!imageFile) return null;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', imageFile);
+
+            const response = await fetch(`http://localhost:8000/api/menu/items/${itemId}/upload-image`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error('Image upload failed');
+
+            const data = await response.json();
+            return data.image_url;
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            alert('Failed to upload image, but item was saved');
+            return null;
+        }
     };
 
     const handleCreateOrUpdateItem = async (e) => {
@@ -139,11 +178,20 @@ function MenuManagement() {
                     }))
             };
 
+            let savedItem;
             if (editingItem) {
-                await menuAPI.updateItem(editingItem.id, itemData);
+                savedItem = await menuAPI.updateItem(editingItem.id, itemData);
+                // Upload image if new one selected
+                if (imageFile) {
+                    await uploadImage(editingItem.id);
+                }
                 alert('Menu item updated successfully!');
             } else {
-                await menuAPI.createItem(itemData);
+                savedItem = await menuAPI.createItem(itemData);
+                // Upload image for new item
+                if (imageFile && savedItem.data?.id) {
+                    await uploadImage(savedItem.data.id);
+                }
                 alert('Menu item created successfully!');
             }
 
@@ -445,6 +493,40 @@ function MenuManagement() {
                                     }}
                                     placeholder="Optional description"
                                 />
+                            </div>
+
+                            {/* Image Upload */}
+                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
+                                    Menu Item Image
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    style={{
+                                        width: '100%',
+                                        padding: 'var(--spacing-md)',
+                                        border: '1px solid var(--border-medium)',
+                                        borderRadius: 'var(--radius-md)',
+                                        fontSize: 'var(--font-size-base)'
+                                    }}
+                                />
+                                {(imagePreview || (editingItem?.image_url)) && (
+                                    <div style={{ marginTop: 'var(--spacing-md)', textAlign: 'center' }}>
+                                        <img
+                                            src={imagePreview || `http://localhost:8000${editingItem?.image_url}`}
+                                            alt="Preview"
+                                            style={{
+                                                maxWidth: '200px',
+                                                maxHeight: '200px',
+                                                borderRadius: 'var(--radius-md)',
+                                                objectFit: 'cover',
+                                                border: '2px solid var(--border-medium)'
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>

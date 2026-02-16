@@ -17,6 +17,14 @@ def get_dashboard_stats(
     """Get dashboard overview statistics"""
     return ReportService.get_dashboard_stats(db, current_user.restaurant_id)
 
+@router.get("/dashboard-charts")
+def get_dashboard_charts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get dashboard chart data for visualizations"""
+    return ReportService.get_dashboard_charts(db, current_user.restaurant_id)
+
 @router.get("/sales")
 def get_sales_report(
     days: int = 7,
