@@ -1,0 +1,43 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+venv/
+ENV/
+env/
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnp
+.pnp.js
+bower_components/
+.npm
+build/
+dist/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+backend/restaurant_pos.db
+backend/test_db.sqlite
+*.log
