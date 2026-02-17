@@ -6,13 +6,14 @@ Handles LLM integration, intent classification, and response generation
 import json
 import re
 import os
+import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from services.schema_context import get_schema_context, get_api_endpoints_context
 from schemas.ai_schemas import Intent, ChatMessage
+from config import settings
 
-# For production, we'll use a simple rule-based system initially
-# and can upgrade to LLaMA later
+logger = logging.getLogger(__name__)
 
 class AIService:
     """
@@ -23,26 +24,25 @@ class AIService:
     def __init__(self):
         self.schema_context = get_schema_context()
         self.api_context = get_api_endpoints_context()
-        # Conversation memory (in-memory for now, can be moved to Redis/DB)
         self.conversations: Dict[str, list] = {}
         
-        # Initialize AI Provider (Groq or Ollama)
-        self.provider = os.getenv('AI_PROVIDER', 'ollama').lower()
+        # Initialize AI Provider - prefer Groq for production speed
+        self.provider = getattr(settings, 'AI_PROVIDER', 'groq').lower()
         self.llm_service = None
         
         try:
             if self.provider == 'groq':
                 from services.groq_service import get_groq_service
-                print("🚀 Initializing Groq AI Service...")
+                logger.info("Initializing Groq AI Service...")
                 self.llm_service = get_groq_service()
             else:
                 from services.ollama_service import get_ollama_service
-                print("🦙 Initializing Ollama AI Service...")
+                logger.info("Initializing Ollama AI Service...")
                 self.llm_service = get_ollama_service()
                 
-            self.use_llm = self.llm_service is not None
+            self.use_llm = self.llm_service is not None and getattr(self.llm_service, 'client', None) is not None
         except Exception as e:
-            print(f"AI Service ({self.provider}) not available: {e}")
+            logger.error(f"AI Service ({self.provider}) not available: {e}")
             self.llm_service = None
             self.use_llm = False
             
@@ -271,7 +271,8 @@ class AIService:
         conversation_id: Optional[str] = None
     ) -> Tuple[str, Optional[Dict[str, Any]]]:
         """
-        Generate natural language response using Local LLM (with fallback)
+        Generate natural language response using Groq LLM (with template fallback).
+        Parses embedded __chart__ blocks from LLM output.
         Returns: (response_text, chart_data)
         """
         
@@ -286,14 +287,44 @@ class AIService:
                     conversation_history
                 )
                 if llm_response:
-                    # If data has chart_data, pass it along even with LLM text
-                    chart_data = data.get('chart_data') if data else None
-                    return llm_response, chart_data
+                    # Parse embedded chart data from LLM response
+                    response_text, chart_data = self._parse_chart_from_response(llm_response)
+                    # Also check if query engine returned chart_data
+                    if not chart_data and data and isinstance(data, dict):
+                        chart_data = data.get('chart_data')
+                    return response_text, chart_data
             except Exception as e:
-                print(f"LLM response generation failed, using template-based: {e}")
+                logger.error(f"LLM response generation failed, using template-based: {e}")
         
         # Fallback to template-based responses
         return self._template_based_response(message, intent, data)
+    
+    def _parse_chart_from_response(self, response: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+        """
+        Extract __chart__{...}__chart__ blocks from LLM response.
+        Returns: (cleaned_text, chart_data_dict)
+        """
+        chart_data = None
+        chart_pattern = r'__chart__(.+?)__chart__'
+        match = re.search(chart_pattern, response, re.DOTALL)
+        
+        if match:
+            try:
+                raw_json = match.group(1).strip()
+                chart_data = json.loads(raw_json)
+                if 'type' in chart_data and 'data' in chart_data:
+                    logger.info(f"Parsed chart from LLM: type={chart_data['type']}, {len(chart_data['data'])} points")
+                else:
+                    chart_data = None
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning(f"Failed to parse chart JSON from LLM: {e}")
+                chart_data = None
+            
+            # Remove the chart block from the visible text
+            response = re.sub(chart_pattern, '', response, flags=re.DOTALL).strip()
+            response = re.sub(r'```\s*$', '', response).strip()
+        
+        return response, chart_data
     
     
     def _template_based_response(
@@ -642,14 +673,61 @@ Just ask me a question!"""
         return response
     
     def add_to_conversation(self, conversation_id: str, message: ChatMessage):
-        """Add message to conversation history"""
+        """Add message to conversation history and track metadata"""
         if conversation_id not in self.conversations:
             self.conversations[conversation_id] = []
         self.conversations[conversation_id].append(message)
+        
+        # Track conversation metadata
+        if not hasattr(self, 'conversation_meta'):
+            self.conversation_meta = {}
+        
+        now = datetime.utcnow()
+        if conversation_id not in self.conversation_meta:
+            # Use first user message as title (truncated)
+            title = message.content[:60] + ('...' if len(message.content) > 60 else '') if message.role == 'user' else 'New Chat'
+            self.conversation_meta[conversation_id] = {
+                'title': title,
+                'created_at': now.isoformat(),
+                'updated_at': now.isoformat(),
+                'message_count': 0
+            }
+        self.conversation_meta[conversation_id]['updated_at'] = now.isoformat()
+        self.conversation_meta[conversation_id]['message_count'] = len(self.conversations[conversation_id])
     
     def get_conversation(self, conversation_id: str) -> list:
         """Get conversation history"""
         return self.conversations.get(conversation_id, [])
+    
+    def list_conversations(self) -> list:
+        """List all conversations with metadata, sorted by most recent"""
+        if not hasattr(self, 'conversation_meta'):
+            self.conversation_meta = {}
+        
+        convos = []
+        for cid, meta in self.conversation_meta.items():
+            convos.append({
+                'conversation_id': cid,
+                'title': meta.get('title', 'Untitled'),
+                'created_at': meta.get('created_at'),
+                'updated_at': meta.get('updated_at'),
+                'message_count': meta.get('message_count', 0)
+            })
+        
+        # Sort by updated_at descending (most recent first)
+        convos.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+        return convos
+    
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """Delete a conversation"""
+        deleted = False
+        if conversation_id in self.conversations:
+            del self.conversations[conversation_id]
+            deleted = True
+        if hasattr(self, 'conversation_meta') and conversation_id in self.conversation_meta:
+            del self.conversation_meta[conversation_id]
+            deleted = True
+        return deleted
 
 
 # Singleton instance
@@ -661,3 +739,4 @@ def get_ai_service() -> AIService:
     if _ai_service is None:
         _ai_service = AIService()
     return _ai_service
+

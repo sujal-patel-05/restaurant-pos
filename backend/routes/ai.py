@@ -121,3 +121,23 @@ def get_history(
 def health_check():
     """Health check endpoint"""
     return {"status": "ok", "service": "ask-ai"}
+
+@router.get("/conversations")
+def list_conversations(
+    current_user: User = Depends(get_current_user)
+):
+    """List all conversations for the sidebar"""
+    ai_service = get_ai_service()
+    return {"conversations": ai_service.list_conversations()}
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a conversation"""
+    ai_service = get_ai_service()
+    deleted = ai_service.delete_conversation(conversation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"status": "deleted", "conversation_id": conversation_id}

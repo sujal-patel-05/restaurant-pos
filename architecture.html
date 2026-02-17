@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SujalPOS AI — System Architecture</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --card: #1a1a28;
+            --border: rgba(255, 255, 255, 0.06);
+            --text: #e8e8f0;
+            --text-dim: #8888a0;
+            --accent: #6366f1;
+            --accent2: #a855f7;
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --pink: #ec4899;
+            --cyan: #06b6d4;
+            --red: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            z-index: 0;
+            background: radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            font-size: 11px;
+            font-weight: 600;
+            color: #818cf8;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .header-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .header h1 {
+            font-size: 2.8rem;
+            font-weight: 900;
+            letter-spacing: -1.5px;
+            background: linear-gradient(135deg, #e8e8f0 0%, #818cf8 50%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.05rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 20px;
+        }
+
+        /* Architecture Flow cards */
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .flow-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .flow-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .flow-card:hover {
+            border-color: rgba(99, 102, 241, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .flow-card .card-num {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            opacity: 0.4;
+        }
+
+        .flow-card .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        .flow-card h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .flow-card p {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* Arrow between flow sections */
+        .flow-arrow {
+            text-align: center;
+            font-size: 24px;
+            color: var(--accent);
+            opacity: 0.5;
+            margin: 4px 0 12px;
+            animation: arrowPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes arrowPulse {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+
+            50% {
+                opacity: 0.7;
+                transform: translateY(3px);
+            }
+        }
+
+        /* Layer Diagram */
+        .layer-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 32px;
+        }
+
+        .layer {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--card);
+            transition: all 0.3s;
+        }
+
+        .layer:hover {
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        .layer-label {
+            width: 180px;
+            min-width: 180px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            border-right: 1px solid var(--border);
+        }
+
+        .layer-label .l-icon {
+            font-size: 18px;
+        }
+
+        .layer-content {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px 16px;
+            align-items: center;
+        }
+
+        .layer-tag {
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s;
+        }
+
+        .layer-tag:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        /* Data Flow Diagram */
+        .dataflow {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dataflow::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2), var(--pink));
+        }
+
+        .dataflow-title {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .dataflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .df-step {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .df-step:last-child {
+            border-bottom: none;
+        }
+
+        .df-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .df-connector {
+            width: 32px;
+            display: flex;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .df-connector .line {
+            width: 2px;
+            height: 20px;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 1px;
+        }
+
+        .df-desc {
+            flex: 1;
+        }
+
+        .df-desc strong {
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .df-desc span {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            margin-left: 6px;
+        }
+
+        .df-file {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: rgba(99, 102, 241, 0.08);
+            color: #818cf8;
+            flex-shrink: 0;
+        }
+
+        /* Tech Stack Grid */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 700px) {
+            .tech-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .tech-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .tech-card:hover {
+            border-color: rgba(99, 102, 241, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .tech-card .tech-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .tech-card h4 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .tech-card p {
+            font-size: 0.68rem;
+            color: var(--text-dim);
+        }
+
+        /* DB Schema */
+        .schema-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 800px) {
+            .schema-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .schema-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            transition: all 0.3s;
+        }
+
+        .schema-card:hover {
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        .schema-card.highlight {
+            border-color: rgba(34, 197, 94, 0.3);
+            background: rgba(34, 197, 94, 0.03);
+        }
+
+        .schema-card h4 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .schema-card .badge {
+            font-size: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .schema-card .fields {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 64px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.75rem;
+        }
+
+        /* Print */
+        @media print {
+            body {
+                background: white;
+                color: #1a1a2e;
+            }
+
+            body::before,
+            body::after {
+                display: none;
+            }
+
+            .flow-card,
+            .layer,
+            .dataflow,
+            .tech-card,
+            .schema-card {
+                border-color: #ddd;
+                background: #fafafa;
+            }
+
+            .header h1 {
+                -webkit-text-fill-color: #1a1a2e;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-badge"><span class="dot"></span> Production Architecture</div>
+            <h1>SujalPOS AI Architecture</h1>
+            <p>Intelligent Restaurant POS System — A multi-layered architecture combining React, FastAPI, Groq LLM, and
+                SQLite for real-time operations and AI-driven insights.</p>
+        </div>
+
+        <!-- ==================== SECTION 1: High-Level Flow ==================== -->
+        <div class="section">
+            <div class="section-label">01 — Overview</div>
+            <div class="section-title">Request Lifecycle</div>
+
+            <div class="flow-grid">
+                <div class="flow-card">
+                    <span class="card-num">01</span>
+                    <div class="icon" style="background:rgba(99,102,241,0.12);color:#818cf8;">🧑‍💻</div>
+                    <h3>User Input</h3>
+                    <p>User types a natural language query in the Ask AI chatbot interface (React frontend).</p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">02</span>
+                    <div class="icon" style="background:rgba(168,85,247,0.12);color:#c084fc;">🧠</div>
+                    <h3>Intent Classification</h3>
+                    <p>Groq LLM classifies intent (sales_query, inventory_query, etc.) with entities and confidence
+                        score.</p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">03</span>
+                    <div class="icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">🗄️</div>
+                    <h3>Data Retrieval</h3>
+                    <p>Query Engine fetches structured data from SQLite database using classified intent and entities.
+                    </p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">04</span>
+                    <div class="icon" style="background:rgba(236,72,153,0.12);color:#f472b6;">💬</div>
+                    <h3>Smart Response</h3>
+                    <p>Groq LLM generates a context-rich, formatted response with tables, charts, and comparisons.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 2: Layer Architecture ==================== -->
+        <div class="section">
+            <div class="section-label">02 — Layers</div>
+            <div class="section-title">System Architecture Stack</div>
+
+            <div class="layer-stack">
+                <div class="layer">
+                    <div class="layer-label" style="background:rgba(99,102,241,0.08);"><span class="l-icon">🖥️</span>
+                        Presentation</div>
+                    <div class="layer-content">
+                        <span class="layer-tag">AskAI.jsx</span>
+                        <span class="layer-tag">ChatMessage.jsx</span>
+                        <span class="layer-tag">AppLayout.jsx</span>
+                        <span class="layer-tag">React 18</span>
+                        <span class="layer-tag">Recharts</span>
+                        <span class="layer-tag">Lucide Icons</span>
+                        <span class="layer-tag">ReactMarkdown</span>
+                    </div>
+                </div>
+                <div class="layer">
+                    <div class="layer-label" style="background:rgba(6,182,212,0.08);"><span class="l-icon">🔌</span> API
+                        Layer</div>
+                    <div class="layer-content">
+                        <span class="layer-tag">FastAPI</span>
+                        <span class="layer-tag">/api/ai/chat</span>
+                        <span class="layer-tag">/api/ai/conversations</span>
+                        <span class="layer-tag">/api/ai/history</span>
+                        <span class="layer-tag">/api/reports/*</span>
+                        <span class="layer-tag">/api/auth/*</span>
+                        <span class="layer-tag">JWT Auth</span>
+                    </div>
+                </div>
+                <div class="layer">
+                    <div class="layer-label" style="background:rgba(168,85,247,0.08);"><span class="l-icon">🧠</span> AI
+                        Engine</div>
+                    <div class="layer-content">
+                        <span class="layer-tag">ai_service.py</span>
+                        <span class="layer-tag">groq_service.py</span>
+                        <span class="layer-tag">query_engine.py</span>
+                        <span class="layer-tag">schema_context.py</span>
+                        <span class="layer-tag">Groq API</span>
+                        <span class="layer-tag">LLaMA 3.3 70B</span>
+                    </div>
+                </div>
+                <div class="layer">
+                    <div class="layer-label" style="background:rgba(245,158,11,0.08);"><span class="l-icon">⚙️</span>
+                        Business Logic</div>
+                    <div class="layer-content">
+                        <span class="layer-tag">report_service.py</span>
+                        <span class="layer-tag">snapshot_service.py</span>
+                        <span class="layer-tag">billing_service.py</span>
+                        <span class="layer-tag">inventory_service.py</span>
+                        <span class="layer-tag">action_engine.py</span>
+                        <span class="layer-tag">order_service.py</span>
+                    </div>
+                </div>
+                <div class="layer">
+                    <div class="layer-label" style="background:rgba(34,197,94,0.08);"><span class="l-icon">🗄️</span>
+                        Data Layer</div>
+                    <div class="layer-content">
+                        <span class="layer-tag">SQLite</span>
+                        <span class="layer-tag">SQLAlchemy ORM</span>
+                        <span class="layer-tag">15 Tables</span>
+                        <span class="layer-tag">daily_summaries</span>
+                        <span class="layer-tag">Auto-Backfill</span>
+                        <span class="layer-tag">UUID PKs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 3: Ask AI Data Flow ==================== -->
+        <div class="section">
+            <div class="section-label">03 — Data Flow</div>
+            <div class="section-title">Ask AI Chat Pipeline</div>
+
+            <div class="dataflow">
+                <div class="dataflow-title">User Message → Intelligent Response</div>
+                <div class="dataflow-steps">
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(99,102,241,0.15);color:#818cf8;">1</div>
+                        <div class="df-desc"><strong>Frontend sends message</strong> <span>with conversation_id via POST
+                                /api/ai/chat</span></div>
+                        <span class="df-file">AskAI.jsx → api.js</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(6,182,212,0.15);color:#22d3ee;">2</div>
+                        <div class="df-desc"><strong>JWT Authentication</strong> <span>validates user identity and
+                                extracts restaurant_id</span></div>
+                        <span class="df-file">routes/ai.py</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(168,85,247,0.15);color:#c084fc;">3</div>
+                        <div class="df-desc"><strong>Intent Classification</strong> <span>hybrid: rule-based first →
+                                Groq LLM fallback with few-shot examples</span></div>
+                        <span class="df-file">ai_service.py → groq_service.py</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(245,158,11,0.15);color:#fbbf24;">4</div>
+                        <div class="df-desc"><strong>Query Engine</strong> <span>maps intent → SQLAlchemy queries +
+                                daily_summaries for comparisons</span></div>
+                        <span class="df-file">query_engine.py</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(34,197,94,0.15);color:#4ade80;">5</div>
+                        <div class="df-desc"><strong>Database Query</strong> <span>fetches orders, inventory, menu,
+                                wastage, daily_summaries</span></div>
+                        <span class="df-file">SQLite + SQLAlchemy</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(236,72,153,0.15);color:#f472b6;">6</div>
+                        <div class="df-desc"><strong>LLM Response Generation</strong> <span>Groq processes data with
+                                system prompt, schema context, and persona</span></div>
+                        <span class="df-file">groq_service.py</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(139,92,246,0.15);color:#a78bfa;">7</div>
+                        <div class="df-desc"><strong>Chart Parsing</strong> <span>extracts __chart__{...}__chart__
+                                blocks → structured chart_data JSON</span></div>
+                        <span class="df-file">ai_service.py</span>
+                    </div>
+                    <div class="df-step">
+                        <div class="df-num" style="background:rgba(99,102,241,0.15);color:#818cf8;">8</div>
+                        <div class="df-desc"><strong>Frontend Rendering</strong> <span>markdown + tables + Recharts
+                                visualization + copy button</span></div>
+                        <span class="df-file">ChatMessage.jsx</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 4: Daily Snapshot System ==================== -->
+        <div class="section">
+            <div class="section-label">04 — Analytics Engine</div>
+            <div class="section-title">Daily Snapshot Pipeline</div>
+
+            <div class="flow-grid">
+                <div class="flow-card">
+                    <span class="card-num">A</span>
+                    <div class="icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">⏰</div>
+                    <h3>Startup Trigger</h3>
+                    <p>On every server start, backfills missing days (last 30 days) for all restaurants automatically.
+                    </p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">B</span>
+                    <div class="icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">📊</div>
+                    <h3>Aggregation</h3>
+                    <p>Computes revenue, orders by type, payment modes, wastage, top item, peak hour per day.</p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">C</span>
+                    <div class="icon" style="background:rgba(99,102,241,0.12);color:#818cf8;">💾</div>
+                    <h3>Upsert Storage</h3>
+                    <p>Stores in daily_summaries table (idempotent). Today refreshed every startup for accuracy.</p>
+                </div>
+                <div class="flow-card">
+                    <span class="card-num">D</span>
+                    <div class="icon" style="background:rgba(236,72,153,0.12);color:#f472b6;">🆚</div>
+                    <h3>Comparison Queries</h3>
+                    <p>LLM uses stored snapshots for: today vs yesterday, weekly trends, monthly reports.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 5: Database Schema ==================== -->
+        <div class="section">
+            <div class="section-label">05 — Database</div>
+            <div class="section-title">Schema — 15 Tables</div>
+
+            <div class="schema-grid">
+                <div class="schema-card">
+                    <h4>🏪 restaurants</h4>
+                    <div class="fields">id, name, address, phone, gstin, logo, settings</div>
+                </div>
+                <div class="schema-card">
+                    <h4>👤 users</h4>
+                    <div class="fields">id, restaurant_id, username, email, role, password_hash</div>
+                </div>
+                <div class="schema-card">
+                    <h4>📂 menu_categories</h4>
+                    <div class="fields">id, restaurant_id, name, display_order, is_active</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🍔 menu_items</h4>
+                    <div class="fields">id, category_id, name, price, is_available, image_url</div>
+                </div>
+                <div class="schema-card">
+                    <h4>📦 ingredients</h4>
+                    <div class="fields">id, name, current_stock, reorder_level, unit, cost_per_unit</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🔗 bom_mappings</h4>
+                    <div class="fields">id, menu_item_id, ingredient_id, quantity_required</div>
+                </div>
+                <div class="schema-card">
+                    <h4>📋 orders</h4>
+                    <div class="fields">id, order_number, status, order_type, total_amount, gst, created_at</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🧾 order_items</h4>
+                    <div class="fields">id, order_id, menu_item_id, quantity, unit_price</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🎫 kot_tickets</h4>
+                    <div class="fields">id, order_id, kot_number, status, created_at</div>
+                </div>
+                <div class="schema-card">
+                    <h4>💳 payments</h4>
+                    <div class="fields">id, order_id, amount, payment_mode, status</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🧾 invoices</h4>
+                    <div class="fields">id, order_id, invoice_number, total, pdf_url</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🏷️ discounts</h4>
+                    <div class="fields">id, restaurant_id, code, type, value, is_active</div>
+                </div>
+                <div class="schema-card">
+                    <h4>📊 inventory_transactions</h4>
+                    <div class="fields">id, ingredient_id, type, quantity, reference</div>
+                </div>
+                <div class="schema-card">
+                    <h4>🗑️ wastage_logs</h4>
+                    <div class="fields">id, ingredient_id, quantity, reason, logged_by</div>
+                </div>
+                <div class="schema-card highlight">
+                    <h4>📈 daily_summaries <span class="badge"
+                            style="background:rgba(34,197,94,0.15);color:#22c55e;">NEW</span></h4>
+                    <div class="fields">id, restaurant_id, summary_date, total_revenue, total_orders, completed,
+                        cancelled, avg_order_value, dine_in/takeaway/delivery breakdown, payments, wastage, top_item,
+                        peak_hour</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 6: Tech Stack ==================== -->
+        <div class="section">
+            <div class="section-label">06 — Technology</div>
+            <div class="section-title">Tech Stack</div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <div class="tech-icon">⚛️</div>
+                    <h4>React 18</h4>
+                    <p>Frontend framework with hooks, Vite bundler</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-icon">⚡</div>
+                    <h4>FastAPI</h4>
+                    <p>Python async API backend with auto-docs</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-icon">🧠</div>
+                    <h4>Groq + LLaMA 3.3 70B</h4>
+                    <p>Ultra-fast LLM inference for chat AI</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-icon">🗄️</div>
+                    <h4>SQLite + SQLAlchemy</h4>
+                    <p>15-table relational database with ORM</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-icon">📊</div>
+                    <h4>Recharts</h4>
+                    <p>Bar, Line, Pie charts for data visualization</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-icon">🔐</div>
+                    <h4>JWT Authentication</h4>
+                    <p>Secure token-based auth with role support</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SECTION 7: Key Features ==================== -->
+        <div class="section">
+            <div class="section-label">07 — Capabilities</div>
+            <div class="section-title">What the AI Can Do</div>
+
+            <div class="flow-grid">
+                <div class="flow-card">
+                    <div class="icon" style="background:rgba(99,102,241,0.12);color:#818cf8;">📈</div>
+                    <h3>Sales Analytics</h3>
+                    <p>Today's/weekly/monthly revenue, daily comparisons, trend analysis with chart generation.</p>
+                </div>
+                <div class="flow-card">
+                    <div class="icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">📦</div>
+                    <h3>Inventory Intelligence</h3>
+                    <p>Low stock alerts, expiry tracking, reorder recommendations, usage analytics.</p>
+                </div>
+                <div class="flow-card">
+                    <div class="icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">🛒</div>
+                    <h3>Order Management</h3>
+                    <p>Create orders via NLP, track status, view history, KOT generation.</p>
+                </div>
+                <div class="flow-card">
+                    <div class="icon" style="background:rgba(236,72,153,0.12);color:#f472b6;">🍽️</div>
+                    <h3>Menu & Insights</h3>
+                    <p>Menu browsing, top sellers, food cost analysis, peak hour identification.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>SujalPOS AI — Production Architecture Document — Generated February 2026</p>
+            <p style="margin-top:4px; opacity:0.5;">Designed for academic presentation and system documentation</p>
+        </div>
+    </div>
+</body>
+
+</html>

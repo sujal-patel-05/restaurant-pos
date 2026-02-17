@@ -5,6 +5,10 @@ from typing import Dict, List
 from uuid import UUID
 from datetime import datetime, timedelta
 from decimal import Decimal
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ReportService:
     """
@@ -424,3 +428,105 @@ class ReportService:
             "profit_percentage": float(profit_percentage),
             "ingredients_breakdown": ingredients_cost
         }
+
+    @staticmethod
+    def get_sales_forecast(db: Session, restaurant_id: UUID, history_days: int = 30, forecast_days: int = 7) -> Dict:
+        """
+        ML-powered sales forecast using polynomial regression.
+        Fetches `history_days` of daily revenue, fits a degree-2 polynomial,
+        and projects revenue for the next `forecast_days`.
+        """
+        today = datetime.utcnow().date()
+        historical = []
+
+        # --- Gather daily revenue for the last N days ---
+        for i in range(history_days - 1, -1, -1):
+            date = today - timedelta(days=i)
+            day_start = datetime.combine(date, datetime.min.time())
+            day_end = datetime.combine(date, datetime.max.time())
+
+            day_orders = db.query(Order).filter(
+                Order.restaurant_id == restaurant_id,
+                Order.created_at >= day_start,
+                Order.created_at <= day_end,
+                Order.status != "cancelled"
+            ).all()
+
+            day_revenue = float(sum(order.total_amount for order in day_orders))
+            historical.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "revenue": round(day_revenue, 2),
+                "type": "historical"
+            })
+
+        revenues = np.array([d["revenue"] for d in historical])
+
+        # Need at least 3 data points for polynomial fit
+        if len(revenues) < 3 or revenues.sum() == 0:
+            return {
+                "historical": historical,
+                "forecast": [],
+                "model": "insufficient_data",
+                "accuracy": 0
+            }
+
+        # --- Fit polynomial regression (degree 2) ---
+        x = np.arange(len(revenues))
+        degree = min(2, len(revenues) - 1)
+
+        try:
+            coeffs = np.polyfit(x, revenues, degree)
+            poly = np.poly1d(coeffs)
+
+            # Calculate R² score on training data
+            predicted_train = poly(x)
+            ss_res = np.sum((revenues - predicted_train) ** 2)
+            ss_tot = np.sum((revenues - np.mean(revenues)) ** 2)
+            r_squared = float(1 - (ss_res / ss_tot)) if ss_tot > 0 else 0
+
+            # Residual standard deviation for confidence bounds
+            residual_std = float(np.std(revenues - predicted_train))
+
+            # --- Generate forecast ---
+            forecast = []
+            for i in range(1, forecast_days + 1):
+                future_x = len(revenues) - 1 + i
+                predicted = float(poly(future_x))
+                predicted = max(0, predicted)  # Revenue can't be negative
+
+                # Confidence bounds widen as we project further
+                margin = residual_std * (1 + 0.15 * i)
+                upper = round(predicted + margin, 2)
+                lower = round(max(0, predicted - margin), 2)
+
+                future_date = today + timedelta(days=i)
+                forecast.append({
+                    "date": future_date.strftime("%Y-%m-%d"),
+                    "forecast": round(predicted, 2),
+                    "upper": upper,
+                    "lower": lower,
+                    "type": "forecast"
+                })
+
+            logger.info(f"Sales forecast generated: R²={r_squared:.3f}, {len(forecast)} days projected")
+
+            return {
+                "historical": historical,
+                "forecast": forecast,
+                "model": f"polynomial_degree_{degree}",
+                "r_squared": round(r_squared, 4),
+                "residual_std": round(residual_std, 2),
+                "avg_daily_revenue": round(float(np.mean(revenues)), 2),
+                "trend": "up" if coeffs[0] > 0 else "down" if degree == 1 else (
+                    "up" if coeffs[-2] > 0 else "down"
+                )
+            }
+        except Exception as e:
+            logger.error(f"Forecast model error: {e}")
+            return {
+                "historical": historical,
+                "forecast": [],
+                "model": "error",
+                "accuracy": 0,
+                "error": str(e)
+            }

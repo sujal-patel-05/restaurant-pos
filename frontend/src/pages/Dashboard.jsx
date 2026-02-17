@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { AppLayout } from '../components/AppLayout';
@@ -14,7 +14,10 @@ import {
     ClipboardList,
     Package,
     CreditCard,
-    BarChart3
+    BarChart3,
+    TrendingUp,
+    Brain,
+    Activity
 } from 'lucide-react';
 
 function Dashboard() {
@@ -31,6 +34,7 @@ function Dashboard() {
         topItems: [],
         orderStatus: []
     });
+    const [forecastData, setForecastData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -70,6 +74,42 @@ function Dashboard() {
                     topItems: chartsRes.data.top_items || [],
                     orderStatus: statusData
                 });
+            }
+
+            // Fetch ML forecast
+            try {
+                const forecastRes = await api.get('/api/reports/sales-forecast');
+                if (forecastRes.data) {
+                    // Merge historical + forecast into a single series
+                    const hist = (forecastRes.data.historical || []).map(d => ({
+                        date: d.date,
+                        revenue: d.revenue,
+                        forecast: null,
+                        upper: null,
+                        lower: null
+                    }));
+                    // Bridge: last historical point starts the forecast line
+                    const lastHist = hist[hist.length - 1];
+                    if (lastHist) {
+                        lastHist.forecast = lastHist.revenue;
+                    }
+                    const fore = (forecastRes.data.forecast || []).map(d => ({
+                        date: d.date,
+                        revenue: null,
+                        forecast: d.forecast,
+                        upper: d.upper,
+                        lower: d.lower
+                    }));
+                    setForecastData({
+                        series: [...hist.slice(-14), ...fore],  // last 14 days + 7 forecast
+                        model: forecastRes.data.model,
+                        r_squared: forecastRes.data.r_squared,
+                        trend: forecastRes.data.trend,
+                        avg_daily: forecastRes.data.avg_daily_revenue
+                    });
+                }
+            } catch (fErr) {
+                console.warn('Forecast unavailable:', fErr);
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -355,6 +395,123 @@ function Dashboard() {
                             </div>
                         )}
                     </div>
+
+                    {/* ML Sales Forecast Chart */}
+                    {forecastData && (
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '700ms', padding: '1.5rem', marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{
+                                        width: 40, height: 40, borderRadius: 12,
+                                        background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}>
+                                        <Brain size={20} color="white" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
+                                            ML Sales Forecast
+                                        </h2>
+                                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                            Polynomial regression on 30-day history
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {forecastData.r_squared != null && (
+                                        <span style={{
+                                            padding: '4px 10px', borderRadius: 8,
+                                            fontSize: 11, fontWeight: 700,
+                                            background: forecastData.r_squared > 0.7
+                                                ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)',
+                                            color: forecastData.r_squared > 0.7 ? '#22c55e' : '#f59e0b',
+                                            border: `1px solid ${forecastData.r_squared > 0.7
+                                                ? 'rgba(34,197,94,.2)' : 'rgba(245,158,11,.2)'}`
+                                        }}>
+                                            R² = {forecastData.r_squared}
+                                        </span>
+                                    )}
+                                    {forecastData.trend && (
+                                        <span style={{
+                                            display: 'flex', alignItems: 'center', gap: 4,
+                                            padding: '4px 10px', borderRadius: 8,
+                                            fontSize: 11, fontWeight: 700,
+                                            background: forecastData.trend === 'up'
+                                                ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)',
+                                            color: forecastData.trend === 'up' ? '#22c55e' : '#ef4444'
+                                        }}>
+                                            <TrendingUp size={12} style={{
+                                                transform: forecastData.trend === 'down' ? 'rotate(180deg)' : 'none'
+                                            }} />
+                                            {forecastData.trend === 'up' ? 'Uptrend' : 'Downtrend'}
+                                        </span>
+                                    )}
+                                    {forecastData.avg_daily && (
+                                        <span style={{
+                                            padding: '4px 10px', borderRadius: 8,
+                                            fontSize: 11, fontWeight: 600,
+                                            background: 'rgba(99,102,241,.1)',
+                                            color: '#818cf8',
+                                            border: '1px solid rgba(99,102,241,.15)'
+                                        }}>
+                                            Avg: ₹{forecastData.avg_daily.toLocaleString('en-IN')}/day
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <ResponsiveContainer width="100%" height={340}>
+                                <LineChart data={forecastData.series}>
+                                    <defs>
+                                        <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
+                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                    <XAxis
+                                        dataKey="date"
+                                        stroke="var(--text-secondary)"
+                                        tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+                                        tickFormatter={(v) => new Date(v).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                                    />
+                                    <YAxis
+                                        stroke="var(--text-secondary)"
+                                        tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+                                        tickFormatter={(v) => `₹${v.toLocaleString()}`}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'var(--card-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '10px',
+                                            color: 'var(--text-main)',
+                                            fontSize: 12
+                                        }}
+                                        formatter={(value, name) => {
+                                            if (value == null) return [null, null];
+                                            const label = name === 'revenue' ? 'Actual'
+                                                : name === 'forecast' ? 'Predicted'
+                                                    : name === 'upper' ? 'Upper Bound'
+                                                        : 'Lower Bound';
+                                            return [`₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, label];
+                                        }}
+                                        labelFormatter={(l) => new Date(l).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                    />
+                                    <Legend
+                                        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                                        formatter={(v) => v === 'revenue' ? 'Historical' : v === 'forecast' ? 'ML Forecast' : v === 'upper' ? 'Upper Bound' : 'Lower Bound'}
+                                    />
+                                    {/* Confidence bounds */}
+                                    <Line type="monotone" dataKey="upper" stroke="#8b5cf680" strokeWidth={1} strokeDasharray="4 4" dot={false} connectNulls={false} />
+                                    <Line type="monotone" dataKey="lower" stroke="#8b5cf680" strokeWidth={1} strokeDasharray="4 4" dot={false} connectNulls={false} />
+                                    {/* Historical */}
+                                    <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1' }} connectNulls={false} />
+                                    {/* Forecast */}
+                                    <Line type="monotone" dataKey="forecast" stroke="#a855f7" strokeWidth={2.5} strokeDasharray="8 4" dot={{ r: 4, fill: '#a855f7', strokeWidth: 2, stroke: '#fff' }} connectNulls={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
 
                     {/* Quick Actions Section */}
                     <div className="mb-xl">

@@ -37,22 +37,18 @@ class QueryEngine:
     
     @staticmethod
     def _query_sales(entities: Dict[str, Any], db: Session, restaurant_id: str) -> Dict[str, Any]:
-        """Query sales data for specified period"""
+        """Query sales data for specified period + historical comparisons from daily_summaries"""
         days = entities.get('days', 1)
         period = entities.get('period', 'today')
         
         now = datetime.now()
         
         if period == 'today':
-            # Start of today (00:00:00)
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         else:
-            # Last N days (rolling window) OR start of that day
-            # For simplicity in this POS context, let's just go back N days from now
             start_date = now - timedelta(days=days)
         
-        # Query all non-cancelled orders (matching dashboard behavior)
-        # Include: placed, preparing, ready, served, completed
+        # Query all non-cancelled orders
         orders = db.query(Order).filter(
             and_(
                 Order.restaurant_id == restaurant_id,
@@ -64,8 +60,7 @@ class QueryEngine:
         total_revenue = sum(order.total_amount for order in orders if order.total_amount)
         total_orders = len(orders)
         
-        # Implement proper grouping for charts (always include for sales queries)
-        # Group by date for the period
+        # Group by date for charts
         daily_sales = {}
         for order in orders:
             if not order.created_at: continue
@@ -74,27 +69,62 @@ class QueryEngine:
                 daily_sales[date_str] = 0
             daily_sales[date_str] += float(order.total_amount or 0)
             
-        # Fill in missing dates if needed (e.g. for last 7 days)
         chart_data = []
         current = start_date
         end_date = datetime.now()
         
         while current <= end_date:
             date_key = current.strftime('%Y-%m-%d')
-            # Short day name for X-axis (e.g., "Mon", "Tue")
             day_name = current.strftime('%a') 
-            
             chart_data.append({
                 "date": date_key,
                 "name": day_name,
                 "sales": daily_sales.get(date_key, 0)
             })
             current += timedelta(days=1)
+        
+        # ── Pull historical comparisons from daily_summaries ──
+        from models import DailySummary
+        today_date = now.date()
+        yesterday_date = today_date - timedelta(days=1)
+        week_ago = today_date - timedelta(days=7)
+        
+        # Get recent daily summaries (last 30 days)
+        recent_summaries = db.query(DailySummary).filter(
+            DailySummary.restaurant_id == restaurant_id,
+            DailySummary.summary_date >= today_date - timedelta(days=30)
+        ).order_by(DailySummary.summary_date.desc()).all()
+        
+        history = []
+        yesterday_data = None
+        for s in recent_summaries:
+            row = {
+                "date": str(s.summary_date),
+                "revenue": float(s.total_revenue or 0),
+                "orders": s.total_orders or 0,
+                "avg_order_value": float(s.avg_order_value or 0),
+                "top_item": s.top_selling_item,
+                "peak_hour": s.peak_hour,
+            }
+            history.append(row)
+            if s.summary_date == yesterday_date:
+                yesterday_data = row
+        
+        # Weekly/monthly aggregates
+        last_7_days = [s for s in recent_summaries if s.summary_date >= week_ago]
+        week_revenue = sum(float(s.total_revenue or 0) for s in last_7_days)
+        week_orders = sum(s.total_orders or 0 for s in last_7_days)
+        month_revenue = sum(float(s.total_revenue or 0) for s in recent_summaries)
+        month_orders = sum(s.total_orders or 0 for s in recent_summaries)
             
         return {
             "total_revenue": float(total_revenue) if total_revenue else 0.0,
             "total_orders": total_orders,
             "period_days": days,
+            "yesterday": yesterday_data,
+            "last_7_days": {"revenue": week_revenue, "orders": week_orders},
+            "last_30_days": {"revenue": month_revenue, "orders": month_orders},
+            "daily_history": history[:14],  # Last 14 days for context
             "chart_data": {
                 "type": "bar",
                 "title": "Sales Trend",

@@ -4,6 +4,7 @@ from models.menu import MenuCategory, MenuItem
 from models.inventory import Ingredient, BOMMaping, InventoryTransaction, WastageLog, UnitType
 from models.order import Order, OrderItem, KOT, OrderStatus, OrderType
 from models.billing import Payment, Invoice, Discount, PaymentMode
+from models.analytics import DailySummary
 
 __all__ = [
     "Restaurant",
@@ -25,4 +26,6 @@ __all__ = [
     "Invoice",
     "Discount",
     "PaymentMode",
+    "DailySummary",
 ]
+

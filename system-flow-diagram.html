@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SujalPOS — System Flow Diagram</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #06060c;
+            --surface: #0e0e18;
+            --card: #161625;
+            --border: rgba(255, 255, 255, 0.06);
+            --t: #e8e8f0;
+            --td: #6b6b88;
+            --accent: #6366f1;
+            --purple: #a855f7;
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --pink: #ec4899;
+            --cyan: #06b6d4;
+            --red: #ef4444
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--t);
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: linear-gradient(rgba(99, 102, 241, 0.025)1px, transparent 1px), linear-gradient(90deg, rgba(99, 102, 241, 0.025)1px, transparent 1px);
+            background-size: 48px 48px
+        }
+
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1
+        }
+
+        /* Header */
+        .hdr {
+            text-align: center;
+            margin-bottom: 48px
+        }
+
+        .hdr .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            border-radius: 16px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            font-size: 10px;
+            font-weight: 700;
+            color: #818cf8;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 14px
+        }
+
+        .hdr .badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: bk 2s ease-in-out infinite
+        }
+
+        @keyframes bk {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .3
+            }
+        }
+
+        .hdr h1 {
+            font-size: 2.4rem;
+            font-weight: 900;
+            letter-spacing: -1.5px;
+            background: linear-gradient(135deg, #e8e8f0, #818cf8, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px
+        }
+
+        .hdr p {
+            font-size: .92rem;
+            color: var(--td);
+            max-width: 550px;
+            margin: 0 auto;
+            line-height: 1.6
+        }
+
+        /* SVG Flow Canvas */
+        .canvas {
+            position: relative;
+            width: 100%;
+            margin-bottom: 40px
+        }
+
+        svg.flow {
+            width: 100%;
+            height: auto
+        }
+
+        /* Nodes */
+        .node {
+            cursor: default;
+            transition: all .3s
+        }
+
+        .node:hover {
+            filter: brightness(1.15)
+        }
+
+        .node rect,
+        .node foreignObject {
+            transition: all .3s
+        }
+
+        /* Labels */
+        .n-label {
+            font-family: 'Inter', sans-serif;
+            fill: var(--t);
+            font-weight: 700;
+            font-size: 12px;
+            text-anchor: middle;
+            dominant-baseline: central
+        }
+
+        .n-sub {
+            font-family: 'Inter', sans-serif;
+            fill: var(--td);
+            font-weight: 500;
+            font-size: 9px;
+            text-anchor: middle;
+            dominant-baseline: central
+        }
+
+        .n-icon {
+            font-size: 18px;
+            text-anchor: middle;
+            dominant-baseline: central
+        }
+
+        /* Arrows */
+        .arrow {
+            stroke-width: 2;
+            fill: none;
+            opacity: .5;
+            transition: opacity .3s
+        }
+
+        .arrow.glow {
+            opacity: .8
+        }
+
+        .arrow-head {
+            fill: currentColor;
+            opacity: .5
+        }
+
+        /* Flow animation */
+        @keyframes dashFlow {
+            to {
+                stroke-dashoffset: -20
+            }
+        }
+
+        .animated-arrow {
+            stroke-dasharray: 8 6;
+            animation: dashFlow 1.5s linear infinite
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: .7rem;
+            color: var(--td)
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 4px
+        }
+
+        /* Bottom notes */
+        .notes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 32px
+        }
+
+        @media(max-width:700px) {
+            .notes {
+                grid-template-columns: 1fr
+            }
+        }
+
+        .note-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px
+        }
+
+        .note-card h4 {
+            font-size: .78rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .note-card p {
+            font-size: .68rem;
+            color: var(--td);
+            line-height: 1.5
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 48px;
+            color: var(--td);
+            font-size: .7rem;
+            opacity: .5
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <div class="hdr">
+            <div class="badge"><span class="dot"></span> System Design</div>
+            <h1>System Flow Diagram</h1>
+            <p>Complete data flow through the SujalPOS AI-powered Restaurant POS System — from user interaction to
+                database and back.</p>
+        </div>
+
+        <!-- ========== MAIN SVG FLOW DIAGRAM ========== -->
+        <div class="canvas">
+            <svg class="flow" viewBox="0 0 1060 920" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="ah1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#6366f1" opacity=".6" />
+                    </marker>
+                    <marker id="ah2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#a855f7" opacity=".6" />
+                    </marker>
+                    <marker id="ah3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#22c55e" opacity=".6" />
+                    </marker>
+                    <marker id="ah4" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#f59e0b" opacity=".6" />
+                    </marker>
+                    <marker id="ah5" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#ec4899" opacity=".6" />
+                    </marker>
+                    <marker id="ah6" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L8,3 L0,6" fill="#06b6d4" opacity=".6" />
+                    </marker>
+                    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#6366f1" />
+                        <stop offset="100%" stop-color="#818cf8" />
+                    </linearGradient>
+                    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#a855f7" />
+                        <stop offset="100%" stop-color="#c084fc" />
+                    </linearGradient>
+                    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#22c55e" />
+                        <stop offset="100%" stop-color="#4ade80" />
+                    </linearGradient>
+                    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#fbbf24" />
+                    </linearGradient>
+                    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#ec4899" />
+                        <stop offset="100%" stop-color="#f472b6" />
+                    </linearGradient>
+                    <linearGradient id="g6" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#06b6d4" />
+                        <stop offset="100%" stop-color="#22d3ee" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="3" result="b" />
+                        <feMerge>
+                            <feMergeNode in="b" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <!-- ============ ROW 1: USER ============ -->
+                <g class="node" transform="translate(430,30)">
+                    <rect x="0" y="0" width="200" height="70" rx="16" fill="var(--card)" stroke="url(#g1)"
+                        stroke-width="1.5" />
+                    <text x="100" y="26" class="n-icon">🧑‍💻</text>
+                    <text x="100" y="46" class="n-label" style="font-size:13px">User / Staff</text>
+                    <text x="100" y="60" class="n-sub">Natural language query</text>
+                </g>
+
+                <!-- Arrow: User → Frontend -->
+                <path d="M530,100 L530,140" stroke="#6366f1" class="arrow animated-arrow" marker-end="url(#ah1)" />
+
+                <!-- ============ ROW 2: FRONTEND ============ -->
+                <g class="node" transform="translate(310,145)">
+                    <rect x="0" y="0" width="440" height="80" rx="16" fill="var(--card)" stroke="url(#g1)"
+                        stroke-width="1.5" />
+                    <rect x="0" y="0" width="440" height="3" rx="2" fill="url(#g1)" opacity=".6" />
+                    <text x="30" y="30" class="n-icon">⚛️</text>
+                    <text x="70" y="30" class="n-label" style="text-anchor:start;font-size:13px">React Frontend</text>
+                    <text x="70" y="46" class="n-sub" style="text-anchor:start">AskAI.jsx · ChatMessage.jsx ·
+                        AppLayout.jsx</text>
+                    <text x="70" y="60" class="n-sub" style="text-anchor:start;fill:#818cf8">Chat UI · Sidebar History ·
+                        Charts (Recharts) · Markdown</text>
+                    <text x="410" y="30" class="n-sub" style="fill:#4ade80;font-weight:700">:5173</text>
+                </g>
+
+                <!-- Arrow: Frontend → API -->
+                <path d="M530,225 L530,270" stroke="#6366f1" class="arrow animated-arrow" marker-end="url(#ah1)" />
+                <text x="545" y="250" class="n-sub" style="fill:#818cf8;font-size:8px">POST /api/ai/chat</text>
+
+                <!-- ============ ROW 3: FASTAPI BACKEND ============ -->
+                <g class="node" transform="translate(260,275)">
+                    <rect x="0" y="0" width="540" height="80" rx="16" fill="var(--card)" stroke="url(#g6)"
+                        stroke-width="1.5" />
+                    <rect x="0" y="0" width="540" height="3" rx="2" fill="url(#g6)" opacity=".6" />
+                    <text x="30" y="30" class="n-icon">⚡</text>
+                    <text x="70" y="30" class="n-label" style="text-anchor:start;font-size:13px">FastAPI Backend</text>
+                    <text x="70" y="46" class="n-sub" style="text-anchor:start">routes/ai.py · routes/reports.py ·
+                        routes/auth.py</text>
+                    <text x="70" y="60" class="n-sub" style="text-anchor:start;fill:#22d3ee">JWT Auth · CORS · API
+                        Routing · Conversation Storage</text>
+                    <text x="510" y="30" class="n-sub" style="fill:#4ade80;font-weight:700">:8000</text>
+                </g>
+
+                <!-- Arrow: API → AI Service (center) -->
+                <path d="M530,355 L530,405" stroke="#a855f7" class="arrow animated-arrow" marker-end="url(#ah2)" />
+
+                <!-- ============ ROW 4: AI SERVICE (center hub) ============ -->
+                <g class="node" transform="translate(350,410)">
+                    <rect x="0" y="0" width="360" height="90" rx="18" fill="var(--card)" stroke="url(#g2)"
+                        stroke-width="2" />
+                    <rect x="0" y="0" width="360" height="3" rx="2" fill="url(#g2)" opacity=".8" />
+                    <text x="30" y="32" class="n-icon" style="font-size:22px">🧠</text>
+                    <text x="72" y="32" class="n-label" style="text-anchor:start;font-size:14px">AI Service</text>
+                    <text x="72" y="50" class="n-sub" style="text-anchor:start">ai_service.py — Central
+                        Orchestrator</text>
+                    <text x="72" y="66" class="n-sub" style="text-anchor:start;fill:#c084fc">Intent Classify → Query
+                        Data → Generate Response → Parse Charts</text>
+                    <text x="330" y="32" class="n-sub" style="fill:#c084fc;font-weight:700;font-size:8px">provider:
+                        groq</text>
+                </g>
+
+                <!-- ========== LEFT BRANCH: Groq LLM ========== -->
+                <!-- Arrow: AI Service → Groq -->
+                <path d="M350,455 L160,455 L160,520" stroke="#ec4899" class="arrow animated-arrow"
+                    marker-end="url(#ah5)" />
+                <text x="240" y="445" class="n-sub" style="fill:#f472b6;font-size:8px">classify + generate</text>
+
+                <g class="node" transform="translate(50,525)">
+                    <rect x="0" y="0" width="220" height="100" rx="16" fill="var(--card)" stroke="url(#g5)"
+                        stroke-width="1.5" />
+                    <rect x="0" y="0" width="220" height="3" rx="2" fill="url(#g5)" opacity=".6" />
+                    <text x="28" y="28" class="n-icon">🧠</text>
+                    <text x="65" y="28" class="n-label" style="text-anchor:start;font-size:12px">Groq LLM</text>
+                    <text x="28" y="48" class="n-sub" style="text-anchor:start">LLaMA 3.3 70B Versatile</text>
+                    <text x="28" y="62" class="n-sub" style="text-anchor:start;fill:#f472b6">groq_service.py</text>
+                    <text x="28" y="78" class="n-sub" style="text-anchor:start">System Prompt + Schema Context</text>
+                    <text x="28" y="90" class="n-sub" style="text-anchor:start">Few-shot Intent + Chart Gen</text>
+                </g>
+
+                <!-- Arrow: Groq → back to AI Service (response) -->
+                <path d="M270,565 L350,510" stroke="#ec4899" class="arrow" marker-end="url(#ah5)"
+                    stroke-dasharray="4 4" />
+                <text x="288" y="528" class="n-sub" style="fill:#f472b6;font-size:7px">response + __chart__</text>
+
+                <!-- ========== RIGHT BRANCH: Query Engine ========== -->
+                <!-- Arrow: AI Service → Query Engine -->
+                <path d="M710,455 L870,455 L870,520" stroke="#f59e0b" class="arrow animated-arrow"
+                    marker-end="url(#ah4)" />
+                <text x="760" y="445" class="n-sub" style="fill:#fbbf24;font-size:8px">intent + entities</text>
+
+                <g class="node" transform="translate(760,525)">
+                    <rect x="0" y="0" width="240" height="90" rx="16" fill="var(--card)" stroke="url(#g4)"
+                        stroke-width="1.5" />
+                    <rect x="0" y="0" width="240" height="3" rx="2" fill="url(#g4)" opacity=".6" />
+                    <text x="28" y="28" class="n-icon">⚙️</text>
+                    <text x="65" y="28" class="n-label" style="text-anchor:start;font-size:12px">Query Engine</text>
+                    <text x="28" y="48" class="n-sub" style="text-anchor:start">query_engine.py</text>
+                    <text x="28" y="62" class="n-sub" style="text-anchor:start;fill:#fbbf24">Intent → SQLAlchemy
+                        Queries</text>
+                    <text x="28" y="78" class="n-sub" style="text-anchor:start">sales · inventory · orders · menu</text>
+                    <text x="28" y="90" class="n-sub" style="text-anchor:start">+ daily_summaries comparisons</text>
+                </g>
+
+                <!-- Arrow: Query Engine → Database -->
+                <path d="M880,615 L880,690" stroke="#22c55e" class="arrow animated-arrow" marker-end="url(#ah3)" />
+                <text x="895" y="655" class="n-sub" style="fill:#4ade80;font-size:8px">SQL queries</text>
+
+                <!-- ========== CENTER-RIGHT BRANCH: Schema Context ========== -->
+                <g class="node" transform="translate(400,560)">
+                    <rect x="0" y="0" width="200" height="55" rx="12" fill="var(--card)" stroke="var(--border)"
+                        stroke-width="1" />
+                    <text x="20" y="22" class="n-icon" style="font-size:14px;text-anchor:start">📋</text>
+                    <text x="42" y="22" class="n-label" style="text-anchor:start;font-size:11px">Schema Context</text>
+                    <text x="20" y="40" class="n-sub" style="text-anchor:start">15 tables · relationships</text>
+                    <text x="20" y="50" class="n-sub" style="text-anchor:start;fill:#818cf8">schema_context.py</text>
+                </g>
+                <!-- Arrow: Schema Context → Groq (provides context) -->
+                <path d="M400,587 L270,587 L270,600" stroke="rgba(255,255,255,0.1)" class="arrow"
+                    stroke-dasharray="3 4" />
+
+                <!-- ============ ROW 5: DATABASE ============ -->
+                <g class="node" transform="translate(260,695)">
+                    <rect x="0" y="0" width="540" height="100" rx="18" fill="var(--card)" stroke="url(#g3)"
+                        stroke-width="2" />
+                    <rect x="0" y="0" width="540" height="3" rx="2" fill="url(#g3)" opacity=".8" />
+                    <text x="30" y="32" class="n-icon" style="font-size:22px">🗄️</text>
+                    <text x="72" y="32" class="n-label" style="text-anchor:start;font-size:14px">SQLite Database</text>
+                    <text x="72" y="50" class="n-sub" style="text-anchor:start">SQLAlchemy ORM · 15 Tables · UUID
+                        Primary Keys</text>
+
+                    <!-- Mini table boxes -->
+                    <rect x="24" y="62" width="72" height="24" rx="6" fill="rgba(99,102,241,0.1)"
+                        stroke="rgba(99,102,241,0.15)" stroke-width="1" />
+                    <text x="60" y="77" class="n-sub" style="fill:#818cf8;font-size:8px;font-weight:600">orders</text>
+
+                    <rect x="104" y="62" width="72" height="24" rx="6" fill="rgba(99,102,241,0.1)"
+                        stroke="rgba(99,102,241,0.15)" stroke-width="1" />
+                    <text x="140" y="77" class="n-sub"
+                        style="fill:#818cf8;font-size:8px;font-weight:600">menu_items</text>
+
+                    <rect x="184" y="62" width="72" height="24" rx="6" fill="rgba(99,102,241,0.1)"
+                        stroke="rgba(99,102,241,0.15)" stroke-width="1" />
+                    <text x="220" y="77" class="n-sub"
+                        style="fill:#818cf8;font-size:8px;font-weight:600">ingredients</text>
+
+                    <rect x="264" y="62" width="72" height="24" rx="6" fill="rgba(99,102,241,0.1)"
+                        stroke="rgba(99,102,241,0.15)" stroke-width="1" />
+                    <text x="300" y="77" class="n-sub"
+                        style="fill:#818cf8;font-size:8px;font-weight:600">payments</text>
+
+                    <rect x="344" y="62" width="72" height="24" rx="6" fill="rgba(99,102,241,0.1)"
+                        stroke="rgba(99,102,241,0.15)" stroke-width="1" />
+                    <text x="380" y="77" class="n-sub" style="fill:#818cf8;font-size:8px;font-weight:600">wastage</text>
+
+                    <rect x="424" y="62" width="96" height="24" rx="6" fill="rgba(34,197,94,0.12)"
+                        stroke="rgba(34,197,94,0.25)" stroke-width="1.5" />
+                    <text x="472" y="77" class="n-sub"
+                        style="fill:#4ade80;font-size:8px;font-weight:700">daily_summaries</text>
+                </g>
+
+                <!-- Arrow: Query Engine data back up to AI Service -->
+                <path d="M760,570 L720,510 L710,500" stroke="#f59e0b" class="arrow" marker-end="url(#ah4)"
+                    stroke-dasharray="4 4" />
+                <text x="745" y="535" class="n-sub" style="fill:#fbbf24;font-size:7px">structured data</text>
+
+                <!-- ============ SNAPSHOT SERVICE (left of DB) ============ -->
+                <g class="node" transform="translate(30,700)">
+                    <rect x="0" y="0" width="200" height="80" rx="14" fill="var(--card)" stroke="rgba(34,197,94,0.25)"
+                        stroke-width="1.5" />
+                    <text x="20" y="26" class="n-icon" style="font-size:16px;text-anchor:start">📊</text>
+                    <text x="44" y="26" class="n-label" style="text-anchor:start;font-size:11px">Snapshot Service</text>
+                    <text x="20" y="44" class="n-sub" style="text-anchor:start">snapshot_service.py</text>
+                    <text x="20" y="58" class="n-sub" style="text-anchor:start;fill:#4ade80">Auto-backfill on
+                        startup</text>
+                    <text x="20" y="72" class="n-sub" style="text-anchor:start">Aggregates daily metrics</text>
+                </g>
+
+                <!-- Arrow: Snapshot → DB -->
+                <path d="M230,740 L260,740" stroke="#22c55e" class="arrow animated-arrow" marker-end="url(#ah3)" />
+                <text x="232" y="732" class="n-sub" style="fill:#4ade80;font-size:7px">upsert</text>
+
+                <!-- Arrow: Startup trigger -->
+                <path d="M130,700 L130,665 L200,665" stroke="rgba(34,197,94,0.3)" class="arrow"
+                    stroke-dasharray="3 4" />
+                <text x="140" y="656" class="n-sub" style="fill:#4ade80;font-size:7px">on startup</text>
+                <g transform="translate(200,650)">
+                    <rect x="0" y="0" width="80" height="22" rx="6" fill="rgba(34,197,94,0.08)"
+                        stroke="rgba(34,197,94,0.15)" stroke-width="1" />
+                    <text x="40" y="14" class="n-sub" style="fill:#4ade80;font-size:8px;font-weight:600">main.py</text>
+                </g>
+
+                <!-- ============ RESPONSE FLOW BACK ============ -->
+                <!-- Arrow: AI Service → FastAPI (response) -->
+                <path d="M530,410 L530,378 L530,355" stroke="#a855f7" class="arrow" marker-end="url(#ah2)"
+                    stroke-dasharray="4 4" />
+
+                <!-- Arrow: FastAPI → Frontend (JSON response) -->
+                <path d="M530,275 L530,248 L530,225" stroke="#6366f1" class="arrow" marker-end="url(#ah1)"
+                    stroke-dasharray="4 4" />
+                <text x="545" y="258" class="n-sub" style="fill:#818cf8;font-size:7px">message + chart_data</text>
+
+                <!-- Arrow: Frontend → User (rendered) -->
+                <path d="M530,145 L530,120 L530,100" stroke="#6366f1" class="arrow" marker-end="url(#ah1)"
+                    stroke-dasharray="4 4" />
+
+                <!-- ============ SIDEBAR: Conversation Storage ============ -->
+                <g class="node" transform="translate(30,300)">
+                    <rect x="0" y="0" width="190" height="65" rx="12" fill="var(--card)" stroke="var(--border)"
+                        stroke-width="1" />
+                    <text x="18" y="22" class="n-icon" style="font-size:14px;text-anchor:start">💾</text>
+                    <text x="40" y="22" class="n-label" style="text-anchor:start;font-size:10px">Conversation
+                        Memory</text>
+                    <text x="18" y="40" class="n-sub" style="text-anchor:start">In-memory storage</text>
+                    <text x="18" y="52" class="n-sub" style="text-anchor:start;fill:#818cf8">Chat history sidebar</text>
+                </g>
+                <path d="M220,332 L260,318" stroke="rgba(255,255,255,0.08)" class="arrow" stroke-dasharray="3 3" />
+
+                <!-- ============ SIDEBAR: Auth (JWT) ============ -->
+                <g class="node" transform="translate(840,300)">
+                    <rect x="0" y="0" width="160" height="55" rx="12" fill="var(--card)" stroke="var(--border)"
+                        stroke-width="1" />
+                    <text x="18" y="22" class="n-icon" style="font-size:14px;text-anchor:start">🔐</text>
+                    <text x="40" y="22" class="n-label" style="text-anchor:start;font-size:10px">JWT Auth</text>
+                    <text x="18" y="40" class="n-sub" style="text-anchor:start">Token verification</text>
+                    <text x="18" y="50" class="n-sub" style="text-anchor:start;fill:#22d3ee">routes/auth.py</text>
+                </g>
+                <path d="M840,327 L800,318" stroke="rgba(255,255,255,0.08)" class="arrow" stroke-dasharray="3 3" />
+
+                <!-- ============ Bottom: Reports API ============ -->
+                <g class="node" transform="translate(30,830)">
+                    <rect x="0" y="0" width="990" height="55" rx="14" fill="var(--card)" stroke="var(--border)"
+                        stroke-width="1" />
+                    <rect x="0" y="0" width="990" height="2" rx="1" fill="url(#g4)" opacity=".3" />
+                    <text x="28" y="22" class="n-icon" style="font-size:14px;text-anchor:start">📊</text>
+                    <text x="50" y="22" class="n-label" style="text-anchor:start;font-size:11px">Reports & Analytics
+                        API</text>
+                    <text x="50" y="40" class="n-sub" style="text-anchor:start">/daily-summaries · /monthly-comparison ·
+                        /sales · /peak-hours · /wastage · /cost-analysis · /sales-forecast</text>
+                </g>
+                <path d="M530,795 L530,830" stroke="rgba(245,158,11,0.2)" class="arrow" stroke-dasharray="3 4" />
+            </svg>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#6366f1"></div> Frontend (React)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#06b6d4"></div> API Layer (FastAPI)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#a855f7"></div> AI Engine (Groq LLM)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#f59e0b"></div> Query Engine
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#22c55e"></div> Database (SQLite)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#ec4899"></div> LLM Service
+            </div>
+            <div class="legend-item">
+                <svg width="24" height="10">
+                    <line x1="0" y1="5" x2="24" y2="5" stroke="#818cf8" stroke-width="2" stroke-dasharray="4 3" />
+                </svg> Response path
+            </div>
+            <div class="legend-item">
+                <svg width="24" height="10">
+                    <line x1="0" y1="5" x2="24" y2="5" stroke="#818cf8" stroke-width="2" stroke-dasharray="6 4">
+                        <animate attributeName="stroke-dashoffset" values="0;-20" dur="1.5s" repeatCount="indefinite" />
+                    </line>
+                </svg> Request path
+            </div>
+        </div>
+
+        <!-- Key Notes -->
+        <div class="notes">
+            <div class="note-card">
+                <h4>🔄 Request Flow</h4>
+                <p>User query → React frontend → FastAPI (JWT auth) → AI Service orchestrates: intent classification via
+                    Groq, data fetch via Query Engine, response generation via Groq → formatted response with optional
+                    chart back to frontend.</p>
+            </div>
+            <div class="note-card">
+                <h4>📊 Daily Snapshots</h4>
+                <p>Snapshot Service runs on server startup, backfills last 30 days of aggregated metrics (revenue,
+                    orders, top items, peak hours) into daily_summaries table. Query Engine pulls this data for
+                    comparison queries.</p>
+            </div>
+            <div class="note-card">
+                <h4>🧠 Dual LLM Usage</h4>
+                <p>Groq is called twice per request: (1) Intent classification with few-shot examples → JSON output, (2)
+                    Intelligent response generation with full schema context, retrieved data, and conversation history.
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">SujalPOS AI — System Flow Diagram — February 2026</div>
+    </div>
+</body>
+
+</html>

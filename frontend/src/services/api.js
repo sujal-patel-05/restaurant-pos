@@ -106,6 +106,8 @@ export const reportsAPI = {
 export const aiAPI = {
     sendMessage: (message, conversationId = null) => api.post('/api/ai/chat', { message, conversation_id: conversationId }),
     getHistory: (conversationId) => api.get(`/api/ai/history/${conversationId}`),
+    getConversations: () => api.get('/api/ai/conversations'),
+    deleteConversation: (conversationId) => api.delete(`/api/ai/conversations/${conversationId}`),
 };
 
 // AI Agents API

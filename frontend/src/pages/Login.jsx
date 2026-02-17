@@ -91,7 +91,6 @@ function Login() {
                 position: 'relative',
                 overflow: 'hidden',
                 background: '#000',
-                display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 padding: '4rem',

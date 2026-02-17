@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
-from database import Base, engine
+from database import Base, engine, SessionLocal
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -57,6 +57,19 @@ async def startup_event():
         print("⏰ Daily Planning Scheduler started")
     except Exception as e:
         print(f"⚠️ Scheduler failed to start: {e}")
+    
+    # Backfill daily summaries on startup
+    try:
+        from services.snapshot_service import SnapshotService
+        from models import Restaurant
+        db = SessionLocal()
+        restaurants = db.query(Restaurant).all()
+        for restaurant in restaurants:
+            SnapshotService.backfill_missing_days(db, str(restaurant.id), lookback_days=30)
+        db.close()
+        print(f"📊 Daily summaries backfilled for {len(restaurants)} restaurant(s)")
+    except Exception as e:
+        print(f"⚠️ Snapshot backfill failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
