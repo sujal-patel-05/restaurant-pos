@@ -3,6 +3,7 @@ import { AppLayout } from '../components/AppLayout';
 import { menuAPI, ordersAPI } from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
+import { Utensils } from 'lucide-react';
 
 function POSTerminal() {
     const [menuItems, setMenuItems] = useState([]);
@@ -12,6 +13,7 @@ function POSTerminal() {
     const [tableNumber, setTableNumber] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [paymentMode, setPaymentMode] = useState('cash'); // Default to cash
 
     useEffect(() => {
         fetchMenuData();
@@ -85,6 +87,7 @@ function POSTerminal() {
             const orderData = {
                 order_type: orderType.replace('-', '_'), // 'dine-in' -> 'dine_in'
                 table_number: orderType === 'dine-in' ? tableNumber : null,
+                payment_mode: paymentMode, // Send selected payment mode
                 items: cart.map(item => ({
                     menu_item_id: item.id,
                     quantity: item.quantity
@@ -220,33 +223,62 @@ function POSTerminal() {
                                         className="module-card"
                                         style={{
                                             cursor: item.is_available ? 'pointer' : 'not-allowed',
-                                            opacity: item.is_available ? 1 : 0.6
+                                            opacity: item.is_available ? 1 : 0.6,
+                                            padding: 0, // Reset padding for image bleed
+                                            overflow: 'hidden',
+                                            display: 'flex',
+                                            flexDirection: 'column'
                                         }}
                                     >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                                            <div className="badge" style={{
-                                                fontSize: '0.7rem',
-                                                background: 'rgba(99, 102, 241, 0.1)',
-                                                color: 'var(--primary)',
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px'
-                                            }}>
-                                                {categories.find(c => c.id === item.category_id)?.name || 'Item'}
-                                            </div>
-                                            {!item.is_available && (
-                                                <div className="badge" style={{ background: 'var(--error-bg)', color: 'var(--error)' }}>
-                                                    Out
-                                                </div>
+                                        {/* Product Image */}
+                                        <div style={{
+                                            height: '150px',
+                                            width: '100%',
+                                            background: item.image_url ? 'transparent' : 'var(--bg-body)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'var(--text-light)',
+                                            fontSize: '2rem',
+                                            borderBottom: '1px solid var(--border-light)'
+                                        }}>
+                                            {item.image_url ? (
+                                                <img
+                                                    src={`http://localhost:8000${item.image_url}`}
+                                                    alt={item.name}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                            ) : (
+                                                <Utensils size={48} color="var(--text-light)" strokeWidth={1.5} />
                                             )}
                                         </div>
 
-                                        <h3 className="module-card-title" style={{ fontSize: '1rem' }}>{item.name}</h3>
-                                        <p className="module-card-description" style={{ marginBottom: '1rem' }}>
-                                            {item.description || 'No description'}
-                                        </p>
+                                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
+                                                <div className="badge" style={{
+                                                    fontSize: '0.7rem',
+                                                    background: 'rgba(99, 102, 241, 0.1)',
+                                                    color: 'var(--primary)',
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '4px'
+                                                }}>
+                                                    {categories.find(c => c.id === item.category_id)?.name || 'Item'}
+                                                </div>
+                                                {!item.is_available && (
+                                                    <div className="badge" style={{ background: 'var(--error-bg)', color: 'var(--error)' }}>
+                                                        Out
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        <div style={{ marginTop: 'auto', fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
-                                            ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                            <h3 className="module-card-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{item.name}</h3>
+                                            <p className="module-card-description" style={{ marginBottom: '1rem', flex: 1 }}>
+                                                {item.description || 'No description'}
+                                            </p>
+
+                                            <div style={{ marginTop: 'auto', fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                                ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -314,6 +346,32 @@ function POSTerminal() {
 
                         {/* Cart Footer */}
                         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-body)' }}>
+
+                            {/* Payment Method Selection */}
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    Payment Method
+                                </label>
+                                <div className="flex gap-sm">
+                                    {['cash', 'upi', 'card'].map(mode => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setPaymentMode(mode)}
+                                            className={`btn ${paymentMode === mode ? 'btn-primary' : 'btn-secondary'}`}
+                                            style={{
+                                                flex: 1,
+                                                textTransform: 'capitalize',
+                                                fontSize: '0.9rem',
+                                                padding: '0.5rem',
+                                                borderColor: paymentMode === mode ? 'var(--primary)' : 'var(--border-color)'
+                                            }}
+                                        >
+                                            {mode === 'upi' ? 'UPI' : mode}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="flex justify-between" style={{ marginBottom: '1rem' }}>
                                 <span style={{ fontWeight: 600 }}>Total</span>
                                 <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>

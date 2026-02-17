@@ -60,7 +60,7 @@ def chat(
                 # Continue with empty data - AI will handle gracefully
         
         # Generate response
-        response_message = ai_service.generate_response(
+        response_message, chart_data = ai_service.generate_response(
             request.message,
             intent,
             data,
@@ -82,6 +82,7 @@ def chat(
             message=response_message,
             intent=intent,
             data=data,
+            chart_data=chart_data,
             conversation_id=conversation_id,
             timestamp=datetime.utcnow()
         )

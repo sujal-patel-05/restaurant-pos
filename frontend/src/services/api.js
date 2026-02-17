@@ -108,4 +108,13 @@ export const aiAPI = {
     getHistory: (conversationId) => api.get(`/api/ai/history/${conversationId}`),
 };
 
+// AI Agents API
+export const agentsAPI = {
+    getInsights: () => api.get('/api/agents/insights'),
+    getStatus: () => api.get('/api/agents/status'),
+    getHistory: (limit = 10) => api.get('/api/agents/history', { params: { limit } }),
+    runAnalysis: () => api.post('/api/agents/run'),
+    getBrief: (runId) => api.get(`/api/agents/brief/${runId}`),
+};
+
 export default api;

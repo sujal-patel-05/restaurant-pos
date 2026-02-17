@@ -5,6 +5,7 @@ Handles LLM integration, intent classification, and response generation
 
 import json
 import re
+import os
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from services.schema_context import get_schema_context, get_api_endpoints_context
@@ -25,13 +26,23 @@ class AIService:
         # Conversation memory (in-memory for now, can be moved to Redis/DB)
         self.conversations: Dict[str, list] = {}
         
-        # Initialize Ollama service (falls back to rule-based)
+        # Initialize AI Provider (Groq or Ollama)
+        self.provider = os.getenv('AI_PROVIDER', 'ollama').lower()
+        self.llm_service = None
+        
         try:
-            from services.ollama_service import get_ollama_service
-            self.llm_service = get_ollama_service()
+            if self.provider == 'groq':
+                from services.groq_service import get_groq_service
+                print("🚀 Initializing Groq AI Service...")
+                self.llm_service = get_groq_service()
+            else:
+                from services.ollama_service import get_ollama_service
+                print("🦙 Initializing Ollama AI Service...")
+                self.llm_service = get_ollama_service()
+                
             self.use_llm = self.llm_service is not None
         except Exception as e:
-            print(f"Ollama service not available: {e}")
+            print(f"AI Service ({self.provider}) not available: {e}")
             self.llm_service = None
             self.use_llm = False
             
@@ -258,9 +269,10 @@ class AIService:
         intent: Intent, 
         data: Optional[Dict[str, Any]] = None,
         conversation_id: Optional[str] = None
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict[str, Any]]]:
         """
         Generate natural language response using Local LLM (with fallback)
+        Returns: (response_text, chart_data)
         """
         
         # Try LLM for intelligent responses
@@ -274,46 +286,55 @@ class AIService:
                     conversation_history
                 )
                 if llm_response:
-                    return llm_response
+                    # If data has chart_data, pass it along even with LLM text
+                    chart_data = data.get('chart_data') if data else None
+                    return llm_response, chart_data
             except Exception as e:
                 print(f"LLM response generation failed, using template-based: {e}")
         
         # Fallback to template-based responses
         return self._template_based_response(message, intent, data)
     
+    
     def _template_based_response(
         self,
         message: str,
         intent: Intent,
         data: Optional[Dict[str, Any]] = None
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict[str, Any]]]:
         """Template-based response generation (fallback)"""
         
         # Handle general/greeting
         if intent.intent_type == "general":
-            return self._handle_general(message)
+            return self._handle_general(message), None
         
         # Handle action-based intents
         if intent.intent_type == "create_order":
-            return self._format_create_order_response(data)
+            return self._format_create_order_response(data), None
         
         # If no data provided, return error
         if not data:
-            return "I couldn't fetch the data for your query. Please try again or rephrase your question."
+            return "I couldn't fetch the data for your query. Please try again or rephrase your question.", None
         
+        # Prepare chart data from query result if available
+        chart_data = data.get('chart_data')
+
         # Generate response based on intent type
+        response_text = ""
         if intent.intent_type == "sales_query":
-            return self._format_sales_response(data, intent.entities)
+            response_text = self._format_sales_response(data, intent.entities)
         elif intent.intent_type == "inventory_query":
-            return self._format_inventory_response(data)
+            response_text = self._format_inventory_response(data)
         elif intent.intent_type == "order_status":
-            return self._format_order_response(data, intent.entities)
+            response_text = self._format_order_response(data, intent.entities)
         elif intent.intent_type == "menu_info":
-            return self._format_menu_response(data, intent.entities)
+            response_text = self._format_menu_response(data, intent.entities)
         elif intent.intent_type == "wastage_query":
-            return self._format_wastage_response(data, intent.entities)
-        
-        return "I understood your question but I'm not sure how to answer it yet. Can you try rephrasing?"
+            response_text = self._format_wastage_response(data, intent.entities)
+        else:
+            response_text = "I understood your question but I'm not sure how to answer it yet. Can you try rephrasing?"
+            
+        return response_text, chart_data
     
     
     def _handle_general(self, message: str) -> str:

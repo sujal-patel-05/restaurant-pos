@@ -28,6 +28,9 @@ function MenuManagement() {
         is_available: true,
         bom_mappings: []
     });
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
+
 
     useEffect(() => {
         fetchData();
@@ -121,9 +124,8 @@ function MenuManagement() {
                 quantity: bom.quantity_required
             })) : []
         });
-        // Clear image state when editing
         setImageFile(null);
-        setImagePreview(null);
+        setImagePreview(item.image_url ? `http://localhost:8000${item.image_url}` : null);
         setShowItemModal(true);
     };
 
@@ -131,7 +133,6 @@ function MenuManagement() {
         const file = e.target.files[0];
         if (file) {
             setImageFile(file);
-            // Create preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImagePreview(reader.result);
@@ -141,27 +142,23 @@ function MenuManagement() {
     };
 
     const uploadImage = async (itemId) => {
-        if (!imageFile) return null;
+        if (!imageFile) return;
+
+        const formData = new FormData();
+        formData.append('file', imageFile);
 
         try {
-            const formData = new FormData();
-            formData.append('file', imageFile);
-
-            const response = await fetch(`http://localhost:8000/api/menu/items/${itemId}/upload-image`, {
+            await fetch(`http://localhost:8000/api/menu/items/${itemId}/image`, {
                 method: 'POST',
                 body: formData,
             });
-
-            if (!response.ok) throw new Error('Image upload failed');
-
-            const data = await response.json();
-            return data.image_url;
         } catch (error) {
             console.error('Error uploading image:', error);
-            alert('Failed to upload image, but item was saved');
-            return null;
+            alert('Failed to upload image');
         }
     };
+
+
 
     const handleCreateOrUpdateItem = async (e) => {
         e.preventDefault();
@@ -174,24 +171,32 @@ function MenuManagement() {
                     .filter(bom => bom.ingredient_id && bom.quantity > 0)
                     .map(bom => ({
                         ingredient_id: bom.ingredient_id,
-                        quantity: parseFloat(bom.quantity)
+                        quantity_required: parseFloat(bom.quantity)
                     }))
             };
 
             let savedItem;
             if (editingItem) {
                 savedItem = await menuAPI.updateItem(editingItem.id, itemData);
-                // Upload image if new one selected
-                if (imageFile) {
-                    await uploadImage(editingItem.id);
-                }
+                if (imageFile) await uploadImage(editingItem.id);
                 alert('Menu item updated successfully!');
             } else {
                 savedItem = await menuAPI.createItem(itemData);
-                // Upload image for new item
-                if (imageFile && savedItem.data?.id) {
-                    await uploadImage(savedItem.data.id);
-                }
+                if (imageFile && savedItem.data?.id) await uploadImage(savedItem.data.id);
+                // The API response structure might be different, let's check. 
+                // menuAPI.createItem returns response, response.data usually holds the item.
+                // But axios returns data in response.data. So savedItem is the response object.
+                // Actually, let's look at api.js if available, but assuming standard axios.
+                // Wait, in previous code: savedItem = await menuAPI.createItem(itemData);
+                // The backend returns the item object directly. 
+                // If using axios, it's response.data.
+                // Let's assume standard behavior. If savedItem is the item itself (from response.data), then savedItem.id.
+                // If savedItem is the axios response, then savedItem.data.id.
+                // menuAPI.createItem calls axios.post.
+                // Let's play it safe and check both or rely on what we know.
+                // In Line 46: setCategories(categoriesRes.data || []);
+                // This implies menuAPI returns the axios response.
+                if (imageFile && savedItem?.data?.id) await uploadImage(savedItem.data.id);
                 alert('Menu item created successfully!');
             }
 
@@ -200,7 +205,10 @@ function MenuManagement() {
             fetchData();
         } catch (error) {
             console.error('Error saving item:', error);
-            const errorMsg = error.response?.data?.detail || error.message || 'Failed to save menu item';
+            const errorData = error.response?.data?.detail;
+            const errorMsg = typeof errorData === 'object'
+                ? JSON.stringify(errorData, null, 2)
+                : (errorData || error.message || 'Failed to save menu item');
             alert(`Error: ${errorMsg}`);
         }
     };
@@ -216,6 +224,8 @@ function MenuManagement() {
             is_available: true,
             bom_mappings: []
         });
+        setImageFile(null);
+        setImagePreview(null);
     };
 
     const handleDeleteItem = async (itemId) => {
@@ -340,6 +350,42 @@ function MenuManagement() {
                                             {item.is_available ? 'Available' : 'Unavailable'}
                                         </span>
                                     </div>
+
+                                    {/* Image Display */}
+                                    {item.image_url ? (
+                                        <div style={{
+                                            marginBottom: 'var(--spacing-md)',
+                                            borderRadius: 'var(--radius-md)',
+                                            overflow: 'hidden',
+                                            height: '150px'
+                                        }}>
+                                            <img
+                                                src={`http://localhost:8000${item.image_url}`}
+                                                alt={item.name}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    transition: 'transform 0.3s'
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            marginBottom: 'var(--spacing-md)',
+                                            borderRadius: 'var(--radius-md)',
+                                            height: '150px',
+                                            background: 'var(--bg-body)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'var(--text-light)',
+                                            fontSize: '2rem'
+                                        }}>
+                                            🍽️
+                                        </div>
+                                    )}
+
                                     <h3 style={{ fontSize: 'var(--font-size-xl)', marginBottom: 'var(--spacing-sm)' }}>
                                         {item.name}
                                     </h3>
@@ -437,235 +483,210 @@ function MenuManagement() {
             </Modal>
 
             {/* Add/Edit Menu Item Modal */}
-            {showItemModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    overflowY: 'auto',
-                    padding: 'var(--spacing-xl)'
-                }}>
-                    <div className="stat-card" style={{ width: '600px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>{editingItem ? 'Edit Menu Item' : 'Add Menu Item'}</h2>
-                        <form onSubmit={handleCreateOrUpdateItem}>
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Item Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={itemForm.name}
-                                    onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
-                                    placeholder="e.g., Margherita Pizza"
-                                />
-                            </div>
+            <Modal
+                isOpen={showItemModal}
+                onClose={() => setShowItemModal(false)}
+                title={editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
+                size="lg"
+            >
+                <form onSubmit={handleCreateOrUpdateItem}>
+                    <div className="form-group">
+                        <label className="form-label">
+                            Item Name *
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={itemForm.name}
+                            onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                            className="form-input"
+                            placeholder="e.g., Margherita Pizza"
+                        />
+                    </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Description
-                                </label>
-                                <textarea
-                                    value={itemForm.description}
-                                    onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
-                                    rows="2"
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)',
-                                        resize: 'vertical'
-                                    }}
-                                    placeholder="Optional description"
-                                />
-                            </div>
+                    <div className="form-group">
+                        <label className="form-label">
+                            Description
+                        </label>
+                        <textarea
+                            value={itemForm.description}
+                            onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                            rows="2"
+                            className="form-input"
+                            style={{ resize: 'vertical' }}
+                            placeholder="Optional description"
+                        />
+                    </div>
 
-                            {/* Image Upload */}
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Menu Item Image
-                                </label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
-                                />
-                                {(imagePreview || (editingItem?.image_url)) && (
-                                    <div style={{ marginTop: 'var(--spacing-md)', textAlign: 'center' }}>
-                                        <img
-                                            src={imagePreview || `http://localhost:8000${editingItem?.image_url}`}
-                                            alt="Preview"
-                                            style={{
-                                                maxWidth: '200px',
-                                                maxHeight: '200px',
-                                                borderRadius: 'var(--radius-md)',
-                                                objectFit: 'cover',
-                                                border: '2px solid var(--border-medium)'
-                                            }}
-                                        />
-                                    </div>
+                    {/* Image Upload */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Item Image
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: 'var(--radius-md)',
+                                background: 'var(--bg-body)',
+                                border: '1px dashed var(--border-color)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden'
+                            }}>
+                                {imagePreview ? (
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                ) : (
+                                    <span style={{ fontSize: '1.5rem', color: 'var(--text-light)' }}>📷</span>
                                 )}
                             </div>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                className="form-input"
+                                style={{ flex: 1 }}
+                            />
+                        </div>
+                    </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Price (₹) *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={itemForm.price}
-                                        onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
-                                        placeholder="12.99"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                        Prep Time (mins)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={itemForm.preparation_time}
-                                        onChange={(e) => setItemForm({ ...itemForm, preparation_time: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: 'var(--spacing-md)',
-                                            border: '1px solid var(--border-medium)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontSize: 'var(--font-size-base)'
-                                        }}
-                                        placeholder="15"
-                                    />
-                                </div>
-                            </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginBottom: '1rem' }}>
+                        <div className="form-group">
+                            <label className="form-label">
+                                Price (₹) *
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                required
+                                value={itemForm.price}
+                                onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
+                                className="form-input"
+                                placeholder="12.99"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">
+                                Prep Time (mins)
+                            </label>
+                            <input
+                                type="number"
+                                value={itemForm.preparation_time}
+                                onChange={(e) => setItemForm({ ...itemForm, preparation_time: e.target.value })}
+                                className="form-input"
+                                placeholder="15"
+                            />
+                        </div>
+                    </div>
 
-                            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 600 }}>
-                                    Category *
-                                </label>
+                    <div className="form-group">
+                        <label className="form-label">
+                            Category *
+                        </label>
+                        <select
+                            required
+                            value={itemForm.category_id}
+                            onChange={(e) => setItemForm({ ...itemForm, category_id: e.target.value })}
+                            className="form-select"
+                        >
+                            <option value="">Select a category</option>
+                            {categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={itemForm.is_available}
+                                onChange={(e) => setItemForm({ ...itemForm, is_available: e.target.checked })}
+                                style={{ accentColor: 'var(--primary)', width: '1.2rem', height: '1.2rem' }}
+                            />
+                            <span style={{ fontWeight: 600 }}>Available for sale</span>
+                        </label>
+                    </div>
+
+                    {/* Bill of Materials */}
+                    <div style={{
+                        background: 'var(--bg-body)',
+                        padding: '1.5rem',
+                        borderRadius: 'var(--radius-lg)',
+                        marginBottom: '1.5rem',
+                        border: '1px solid var(--border-color)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <label style={{ fontWeight: 600, color: 'var(--text-main)' }}>Bill of Materials (BOM)</label>
+                            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.875rem' }} onClick={addBOMMapping}>
+                                + Add Ingredient
+                            </button>
+                        </div>
+
+                        {itemForm.bom_mappings.length === 0 && (
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontStyle: 'italic', textAlign: 'center', padding: '1rem' }}>
+                                No ingredients added. Add ingredients to track inventory.
+                            </p>
+                        )}
+
+                        {itemForm.bom_mappings.map((bom, index) => (
+                            <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '0.75rem', marginBottom: '0.75rem', alignItems: 'center' }}>
                                 <select
-                                    required
-                                    value={itemForm.category_id}
-                                    onChange={(e) => setItemForm({ ...itemForm, category_id: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: 'var(--spacing-md)',
-                                        border: '1px solid var(--border-medium)',
-                                        borderRadius: 'var(--radius-md)',
-                                        fontSize: 'var(--font-size-base)'
-                                    }}
+                                    value={bom.ingredient_id}
+                                    onChange={(e) => updateBOMMapping(index, 'ingredient_id', e.target.value)}
+                                    className="form-select"
+                                    style={{ padding: '0.5rem' }}
                                 >
-                                    <option value="">Select a category</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    <option value="">Select ingredient</option>
+                                    {ingredients.map(ing => (
+                                        <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
                                     ))}
                                 </select>
-                            </div>
-
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={itemForm.is_available}
-                                        onChange={(e) => setItemForm({ ...itemForm, is_available: e.target.checked })}
-                                    />
-                                    <span style={{ fontWeight: 600 }}>Available for sale</span>
-                                </label>
-                            </div>
-
-                            {/* Bill of Materials */}
-                            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                                    <label style={{ fontWeight: 600 }}>Bill of Materials (BOM)</label>
-                                    <button type="button" className="btn btn-secondary" style={{ fontSize: 'var(--font-size-sm)' }} onClick={addBOMMapping}>
-                                        + Add Ingredient
-                                    </button>
-                                </div>
-                                {itemForm.bom_mappings.map((bom, index) => (
-                                    <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
-                                        <select
-                                            value={bom.ingredient_id}
-                                            onChange={(e) => updateBOMMapping(index, 'ingredient_id', e.target.value)}
-                                            style={{
-                                                padding: 'var(--spacing-sm)',
-                                                border: '1px solid var(--border-medium)',
-                                                borderRadius: 'var(--radius-md)',
-                                                fontSize: 'var(--font-size-sm)'
-                                            }}
-                                        >
-                                            <option value="">Select ingredient</option>
-                                            {ingredients.map(ing => (
-                                                <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-                                            ))}
-                                        </select>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={bom.quantity}
-                                            onChange={(e) => updateBOMMapping(index, 'quantity', e.target.value)}
-                                            placeholder="Qty"
-                                            style={{
-                                                padding: 'var(--spacing-sm)',
-                                                border: '1px solid var(--border-medium)',
-                                                borderRadius: 'var(--radius-md)',
-                                                fontSize: 'var(--font-size-sm)'
-                                            }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeBOMMapping(index)}
-                                            className="btn btn-secondary"
-                                            style={{ padding: '0.5rem', color: 'var(--error)' }}
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
-                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowItemModal(false)}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                                    {editingItem ? 'Update Menu Item' : 'Create Menu Item'}
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={bom.quantity}
+                                    onChange={(e) => updateBOMMapping(index, 'quantity', e.target.value)}
+                                    placeholder="Qty"
+                                    className="form-input"
+                                    style={{ padding: '0.5rem' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => removeBOMMapping(index)}
+                                    className="btn btn-secondary"
+                                    style={{
+                                        padding: '0.5rem',
+                                        color: 'var(--error)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '36px',
+                                        height: '36px'
+                                    }}
+                                    title="Remove Ingredient"
+                                >
+                                    ✕
                                 </button>
                             </div>
-                        </form>
+                        ))}
                     </div>
-                </div>
-            )}
+
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setShowItemModal(false)}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary">
+                            {editingItem ? 'Update Menu Item' : 'Create Menu Item'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Manage Categories Modal */}
             <Modal

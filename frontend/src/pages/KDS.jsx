@@ -1,291 +1,275 @@
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { kdsAPI } from '../services/api';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
-function KDS() {
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error("KDS Error:", error, errorInfo);
+        this.setState({ error, errorInfo });
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>
+                    <h2>Something went wrong in KDS.</h2>
+                    <details style={{ whiteSpace: 'pre-wrap', marginTop: '1rem', textAlign: 'left', background: '#f0f0f0', padding: '1rem' }}>
+                        {this.state.error && this.state.error.toString()}
+                        <br />
+                        {this.state.errorInfo && this.state.errorInfo.componentStack}
+                    </details>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+
+function KDSContent() {
     const [kots, setKots] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all');
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         fetchKOTs();
-        // Auto-refresh every 10 seconds
-        const interval = setInterval(fetchKOTs, 10000);
-        return () => clearInterval(interval);
+
+        // Auto-refresh every 30 seconds
+        const interval = setInterval(fetchKOTs, 30000);
+
+        // Clock timer
+        const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+
+        return () => {
+            clearInterval(interval);
+            clearInterval(clockInterval);
+        };
     }, []);
 
     const fetchKOTs = async () => {
         try {
-            const response = await kdsAPI.getAllKOTs(); // Fetch all (including completed)
+            const response = await kdsAPI.getActiveKOTs();
             setKots(response.data || []);
-            setLoading(false);
+            setError(null);
         } catch (error) {
-            console.error('Error fetching KOTs:', error);
+            console.error('Error fetching KDS data:', error);
+            setError("Failed to load orders");
+        } finally {
             setLoading(false);
         }
     };
 
-    const updateStatus = async (kotId, newStatus) => {
+    const handleStatusUpdate = async (kotId, newStatus) => {
         try {
             await kdsAPI.updateKOTStatus(kotId, newStatus);
-            await fetchKOTs(); // Refresh the list
+            fetchKOTs(); // Refresh immediately
         } catch (error) {
-            console.error('Error updating KOT status:', error);
-            alert('Failed to update status. Please try again.');
+            console.error('Error updating status:', error);
+            alert('Failed to update order status');
         }
+    };
+
+    const getElapsedTime = (createdStr) => {
+        const created = new Date(createdStr);
+        const diff = Math.floor((currentTime - created) / 1000 / 60); // minutes
+        return diff;
     };
 
     const getStatusColor = (status) => {
         switch (status) {
             case 'placed': return 'var(--warning)';
-            case 'preparing': return 'var(--info)';
+            case 'pending': return 'var(--warning)'; // Fallback
+            case 'preparing': return 'var(--primary)';
             case 'ready': return 'var(--success)';
-            case 'completed': return 'var(--text-secondary)';
             default: return 'var(--text-secondary)';
         }
     };
 
-    const getStatusBadge = (status) => {
+    const getStatusBadgeClass = (status) => {
         switch (status) {
             case 'placed': return 'badge-warning';
-            case 'preparing': return 'badge badge-info';
+            case 'pending': return 'badge-warning'; // Fallback
+            case 'preparing': return 'badge-primary';
             case 'ready': return 'badge-success';
-            case 'completed': return 'badge';
             default: return 'badge';
         }
     };
 
-    const filteredKots = filter === 'all'
-        ? kots
-        : kots.filter(kot => kot.status === filter);
-
     const actions = (
-        <>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {currentTime.toLocaleTimeString()}
+            </div>
             <button className="btn btn-secondary" onClick={fetchKOTs}>
-                <span>🔄</span>
-                Refresh
+                🔄 Refresh
             </button>
-            <button className="btn btn-primary">
-                <span>⚙️</span>
-                Settings
-            </button>
-        </>
+        </div>
     );
+
+    if (error) {
+        return (
+            <AppLayout title="Kitchen Display System" actions={actions}>
+                <div className="error-message">{error}</div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout
             title="Kitchen Display System"
-            subtitle="Real-time order tracking and management"
+            subtitle="Real-time order management"
             actions={actions}
         >
-            {/* Status Filter */}
-            <div className="mb-xl">
-                <div style={{ display: 'flex', gap: 'var(--spacing-md)', overflowX: 'auto', paddingBottom: 'var(--spacing-sm)' }}>
-                    <button
-                        className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFilter('all')}
-                    >
-                        All Orders ({kots.length})
-                    </button>
-                    <button
-                        className={`btn ${filter === 'placed' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFilter('placed')}
-                    >
-                        Pending ({kots.filter(k => k.status === 'placed').length})
-                    </button>
-                    <button
-                        className={`btn ${filter === 'preparing' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFilter('preparing')}
-                    >
-                        Preparing ({kots.filter(k => k.status === 'preparing').length})
-                    </button>
-                    <button
-                        className={`btn ${filter === 'ready' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFilter('ready')}
-                    >
-                        Ready ({kots.filter(k => k.status === 'ready').length})
-                    </button>
-                    <button
-                        className={`btn ${filter === 'completed' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setFilter('completed')}
-                    >
-                        Completed ({kots.filter(k => k.status === 'completed').length})
-                    </button>
-                </div>
-            </div>
-
             {loading ? (
-                <div style={{ textAlign: 'center', padding: '4rem' }}>
-                    <div className="loader">Loading orders...</div>
+                <div style={{ display: 'flex', justifyContent: 'center', height: '400px', alignItems: 'center' }}>
+                    <LoadingSpinner size="lg" />
                 </div>
-            ) : filteredKots.length === 0 ? (
-                <div className="stat-card" style={{ textAlign: 'center', padding: '4rem' }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>👨‍🍳</div>
-                    <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>No Active Orders</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
-                        All caught up! New orders will appear here automatically.
-                    </p>
+            ) : (!kots || kots.length === 0) ? (
+                <div className="stat-card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: 'var(--spacing-lg)' }}>👨‍🍳</div>
+                    <h2>No Active Orders</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Kitchen is clear!</p>
                 </div>
             ) : (
-                /* Orders Grid */
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
-                    gap: '2rem'
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    gap: 'var(--spacing-lg)'
                 }}>
-                    {filteredKots.map(kot => (
-                        <div
-                            key={kot.id}
-                            className="stat-card fade-in-up"
-                            style={{
-                                borderLeft: `5px solid ${getStatusColor(kot.status)}`,
-                                transition: 'all var(--transition-base)',
-                                padding: '1.75rem'
-                            }}
-                        >
-                            {/* Order Header */}
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                marginBottom: '1.5rem',
-                                paddingBottom: '1rem',
-                                borderBottom: '2px solid var(--border-color)'
+                    {(kots || []).map(kot => {
+                        const minsWait = getElapsedTime(kot.created_at);
+                        const isLate = minsWait > 20;
+
+                        return (
+                            <div key={kot.id} className="stat-card" style={{
+                                borderLeft: `6px solid ${getStatusColor(kot.status)}`,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                animation: isLate ? 'pulse-border 2s infinite' : 'none'
                             }}>
-                                <div>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
-                                        {kot.kot_number}
-                                    </h3>
-                                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                        Order #{kot.order?.order_number} • {new Date(kot.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
+                                {isLate && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        right: 0,
+                                        background: 'var(--error)',
+                                        color: 'white',
+                                        padding: '0.25rem 0.5rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold',
+                                        borderBottomLeftRadius: '8px'
+                                    }}>
+                                        LATE ({minsWait}m)
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <h3 style={{ margin: 0 }}>#{kot.kot_number || (kot.id && kot.id.toString().slice(0, 6)) || '???'}</h3>
+                                    <span className={`badge ${getStatusBadgeClass(kot.status)}`}>
+                                        {kot.status?.toUpperCase() || 'UNKNOWN'}
+                                    </span>
                                 </div>
-                                <div className={getStatusBadge(kot.status)} style={{
-                                    textTransform: 'capitalize',
-                                    fontSize: '0.875rem',
-                                    padding: '0.5rem 1rem',
-                                    fontWeight: 600
+
+                                <div style={{
+                                    marginBottom: '1rem',
+                                    paddingBottom: '1rem',
+                                    borderBottom: '1px solid var(--border-light)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.9rem'
                                 }}>
-                                    {kot.status}
+                                    <span>Wait: {minsWait} mins</span>
+                                    <span>Table: {kot.table_number || 'N/A'}</span>
+                                </div>
+
+                                <div style={{ marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                        {(kot.items || []).map((item, idx) => (
+                                            <li key={idx} style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                marginBottom: '0.5rem',
+                                                fontSize: '1.1rem',
+                                                fontWeight: 500
+                                            }}>
+                                                <span>{item.quantity}x {item.name}</span>
+                                                {item.notes && (
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontStyle: 'italic', marginLeft: '1rem' }}>
+                                                        {item.notes}
+                                                    </div>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
+                                    {(kot.status === 'placed' || kot.status === 'pending') && (
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => handleStatusUpdate(kot.id, 'preparing')}
+                                        >
+                                            Start Preparing
+                                        </button>
+                                    )}
+                                    {kot.status === 'preparing' && (
+                                        <button
+                                            className="btn btn-success"
+                                            style={{ backgroundColor: 'var(--success)', borderColor: 'var(--success)', color: 'white' }}
+                                            onClick={() => handleStatusUpdate(kot.id, 'ready')}
+                                        >
+                                            Mark Ready
+                                        </button>
+                                    )}
+                                    {kot.status === 'ready' && (
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={() => handleStatusUpdate(kot.id, 'completed')}
+                                        >
+                                            Complete Order
+                                        </button>
+                                    )}
+                                    <button
+                                        className="btn btn-secondary"
+                                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                                        onClick={() => handleStatusUpdate(kot.id, 'cancelled')}
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
                             </div>
-
-                            {/* Order Items */}
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-                                    Items:
-                                </h4>
-                                {kot.order_item && (
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '1rem',
-                                        background: 'var(--bg-main)',
-                                        borderRadius: '0.75rem',
-                                        marginBottom: '0.75rem',
-                                        border: '1px solid var(--border-color)'
-                                    }}>
-                                        <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-main)' }}>
-                                            {kot.order_item.menu_item?.name || 'Unknown Item'}
-                                        </span>
-                                        <span style={{
-                                            background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                                            color: 'white',
-                                            padding: '0.5rem 1rem',
-                                            borderRadius: '0.5rem',
-                                            fontWeight: 700,
-                                            fontSize: '1rem',
-                                            minWidth: '50px',
-                                            textAlign: 'center'
-                                        }}>
-                                            ×{kot.order_item.quantity}
-                                        </span>
-                                    </div>
-                                )}
-                                {kot.order_item?.special_instructions && (
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(251, 191, 36, 0.1)',
-                                        border: '1px solid rgba(251, 191, 36, 0.3)',
-                                        borderRadius: '0.75rem',
-                                        fontSize: '0.875rem',
-                                        marginTop: '0.75rem',
-                                        color: 'var(--text-main)'
-                                    }}>
-                                        <strong style={{ color: '#F59E0B' }}>📝 Note:</strong> {kot.order_item.special_instructions}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                {kot.status === 'placed' && (
-                                    <button
-                                        onClick={() => updateStatus(kot.id, 'preparing')}
-                                        className="btn btn-primary"
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.875rem',
-                                            fontSize: '1rem',
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        🔥 Start Preparing
-                                    </button>
-                                )}
-                                {kot.status === 'preparing' && (
-                                    <button
-                                        onClick={() => updateStatus(kot.id, 'ready')}
-                                        className="btn btn-primary"
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.875rem',
-                                            fontSize: '1rem',
-                                            fontWeight: 600,
-                                            background: 'linear-gradient(135deg, #3B82F6, #1E40AF)'
-                                        }}
-                                    >
-                                        ✅ Mark Ready
-                                    </button>
-                                )}
-                                {kot.status === 'ready' && (
-                                    <button
-                                        onClick={() => updateStatus(kot.id, 'completed')}
-                                        className="btn btn-primary"
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.875rem',
-                                            fontSize: '1rem',
-                                            fontWeight: 600,
-                                            background: 'linear-gradient(135deg, #10B981, #059669)'
-                                        }}
-                                    >
-                                        🎉 Complete
-                                    </button>
-                                )}
-                                {kot.status === 'completed' && (
-                                    <div style={{
-                                        flex: 1,
-                                        textAlign: 'center',
-                                        padding: '0.875rem',
-                                        color: '#10B981',
-                                        fontWeight: 600,
-                                        fontSize: '1rem',
-                                        background: 'rgba(16, 185, 129, 0.1)',
-                                        border: '2px solid rgba(16, 185, 129, 0.3)',
-                                        borderRadius: '0.75rem'
-                                    }}>
-                                        ✓ Completed
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
+            <style>{`
+                @keyframes pulse-border {
+                    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+                }
+            `}</style>
         </AppLayout>
     );
 }
 
-export default KDS;
+export default function KDS() {
+    return (
+        <ErrorBoundary>
+            <KDSContent />
+        </ErrorBoundary>
+    );
+}

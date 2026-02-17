@@ -39,7 +39,17 @@ class QueryEngine:
     def _query_sales(entities: Dict[str, Any], db: Session, restaurant_id: str) -> Dict[str, Any]:
         """Query sales data for specified period"""
         days = entities.get('days', 1)
-        start_date = datetime.utcnow() - timedelta(days=days)
+        period = entities.get('period', 'today')
+        
+        now = datetime.now()
+        
+        if period == 'today':
+            # Start of today (00:00:00)
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            # Last N days (rolling window) OR start of that day
+            # For simplicity in this POS context, let's just go back N days from now
+            start_date = now - timedelta(days=days)
         
         # Query all non-cancelled orders (matching dashboard behavior)
         # Include: placed, preparing, ready, served, completed
@@ -54,10 +64,44 @@ class QueryEngine:
         total_revenue = sum(order.total_amount for order in orders if order.total_amount)
         total_orders = len(orders)
         
+        # Implement proper grouping for charts (always include for sales queries)
+        # Group by date for the period
+        daily_sales = {}
+        for order in orders:
+            if not order.created_at: continue
+            date_str = order.created_at.strftime('%Y-%m-%d')
+            if date_str not in daily_sales:
+                daily_sales[date_str] = 0
+            daily_sales[date_str] += float(order.total_amount or 0)
+            
+        # Fill in missing dates if needed (e.g. for last 7 days)
+        chart_data = []
+        current = start_date
+        end_date = datetime.now()
+        
+        while current <= end_date:
+            date_key = current.strftime('%Y-%m-%d')
+            # Short day name for X-axis (e.g., "Mon", "Tue")
+            day_name = current.strftime('%a') 
+            
+            chart_data.append({
+                "date": date_key,
+                "name": day_name,
+                "sales": daily_sales.get(date_key, 0)
+            })
+            current += timedelta(days=1)
+            
         return {
             "total_revenue": float(total_revenue) if total_revenue else 0.0,
             "total_orders": total_orders,
-            "period_days": days
+            "period_days": days,
+            "chart_data": {
+                "type": "bar",
+                "title": "Sales Trend",
+                "data": chart_data,
+                "dataKey": "sales",
+                "xAxisKey": "name"
+            }
         }
     
     @staticmethod

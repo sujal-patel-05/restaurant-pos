@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from models import Order, OrderItem, KOT, OrderStatus, MenuItem
+from models.billing import Payment, PaymentMode
 from services.inventory_service import InventoryService
 from utils.helpers import generate_order_number, generate_kot_number
 from typing import List, Dict
@@ -117,6 +118,22 @@ class OrderService:
             order.gst_amount = gst_amount
             order.discount_amount = discount_amount
             order.total_amount = total_amount
+            
+            # Create Payment if mode is provided
+            payment_mode = order_data.get("payment_mode")
+            if payment_mode:
+                payment = Payment(
+                    order_id=order.id,
+                    payment_mode=PaymentMode(payment_mode),
+                    amount=Decimal(order_data.get("amount_paid") or total_amount),
+                    payment_status="completed",
+                    transaction_id=f"TXN-{order_number}"  # Auto-generate for now
+                )
+                db.add(payment)
+                
+                # If fully paid, mark order as COMPLETED (or keep PLACED if kitchen workflow needed)
+                # For POS, if paid, usually means completed or at least confirmed. 
+                # Keeping as PLACED so it goes to KDS.
             
             db.commit()
             db.refresh(order)

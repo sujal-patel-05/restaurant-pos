@@ -31,6 +31,8 @@ class OrderCreate(BaseModel):
     special_instructions: Optional[str] = None
     items: List[OrderItemCreate]
     discount_amount: float = 0
+    payment_mode: Optional[str] = None  # 'cash', 'upi', 'card'
+    amount_paid: Optional[float] = None
 
 class OrderResponse(BaseModel):
     id: UUID4

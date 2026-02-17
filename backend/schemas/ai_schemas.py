@@ -26,6 +26,7 @@ class ChatResponse(BaseModel):
     message: str
     intent: Optional[Intent] = None
     data: Optional[Dict[str, Any]] = None  # Structured data if query was executed
+    chart_data: Optional[Dict[str, Any]] = None  # Data for frontend visualization
     conversation_id: str
     timestamp: datetime = datetime.utcnow()
 

@@ -11,20 +11,32 @@ import InventoryDashboard from './pages/InventoryDashboard';
 import BillingInterface from './pages/BillingInterface';
 import ReportsDashboard from './pages/ReportsDashboard';
 import AskAI from './pages/AskAI';
+import AgentInsights from './pages/AgentInsights';
+
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
     return (
         <BrowserRouter>
             <Routes>
+                {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/pos" element={<POSTerminal />} />
-                <Route path="/kds" element={<KDS />} />
-                <Route path="/menu" element={<MenuManagement />} />
-                <Route path="/inventory" element={<InventoryDashboard />} />
-                <Route path="/billing" element={<BillingInterface />} />
-                <Route path="/reports" element={<ReportsDashboard />} />
-                <Route path="/ask-ai" element={<AskAI />} />
+
+                {/* Protected Routes */}
+                <Route element={<ProtectedRoute />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/pos" element={<POSTerminal />} />
+                    <Route path="/kds" element={<KDS />} />
+                    <Route path="/menu" element={<MenuManagement />} />
+                    <Route path="/inventory" element={<InventoryDashboard />} />
+                    <Route path="/billing" element={<BillingInterface />} />
+                    <Route path="/reports" element={<ReportsDashboard />} />
+                    <Route path="/ask-ai" element={<AskAI />} />
+                    <Route path="/agents" element={<AgentInsights />} />
+                </Route>
+
+                {/* Catch all - redirect to dashboard (which will redirect to login if needed) */}
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
     );

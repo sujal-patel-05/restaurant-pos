@@ -8,6 +8,10 @@ from schemas.menu_schemas import (
 )
 from uuid import UUID
 from typing import List
+from fastapi import File, UploadFile
+import shutil
+import os
+from pathlib import Path
 
 router = APIRouter(prefix="/api/menu", tags=["Menu Management"])
 
@@ -270,7 +274,52 @@ def delete_menu_item(
         return {"message": "Menu item deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
         db.rollback()
         print(f"Error deleting menu item: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting menu item: {str(e)}")
+
+@router.post("/items/{item_id}/image")
+async def upload_item_image(
+    item_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload an image for a menu item"""
+    try:
+        restaurant = get_default_restaurant(db)
+        
+        # Verify item exists
+        item = db.query(MenuItem).filter(
+            MenuItem.id == str(item_id),
+            MenuItem.restaurant_id == restaurant.id
+        ).first()
+        
+        if not item:
+            raise HTTPException(status_code=404, detail="Menu item not found")
+        
+        # Create directory if not exists
+        upload_dir = Path("public/images/menu_items")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename
+        file_extension = os.path.splitext(file.filename)[1]
+        filename = f"{item_id}{file_extension}"
+        file_path = upload_dir / filename
+        
+        # Save file
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Update database
+        # Store relative path for frontend access
+        image_url = f"/public/images/menu_items/{filename}"
+        item.image_url = image_url
+        db.commit()
+        db.refresh(item)
+        
+        return {"image_url": image_url}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")

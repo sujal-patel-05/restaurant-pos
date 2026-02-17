@@ -49,10 +49,16 @@ def get_all_kots(
 def update_kot_status(
     kot_id: UUID,
     status: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Update KOT status"""
+    # Verify status is valid
+    valid_statuses = [s.value for s in OrderStatus]
+    if status not in valid_statuses:
+         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of {valid_statuses}")
+
+    # Use service to update
     result = OrderService.update_kot_status(db, kot_id, status)
     
     if not result.get("success"):

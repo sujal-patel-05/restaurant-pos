@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { aiAPI } from '../services/api';
+import ChatMessage from '../components/ChatMessage';
 
 function AskAI() {
     const [messages, setMessages] = useState([]);
@@ -49,6 +50,7 @@ function AskAI() {
             const assistantMessage = {
                 role: 'assistant',
                 content: response.data.message,
+                chartData: response.data.chart_data,
                 timestamp: new Date(response.data.timestamp)
             };
 
@@ -107,47 +109,7 @@ function AskAI() {
                     background: 'linear-gradient(180deg, var(--card-bg) 0%, var(--bg-main) 100%)'
                 }}>
                     {messages.map((msg, index) => (
-                        <div
-                            key={index}
-                            className="fade-in-up"
-                            style={{
-                                display: 'flex',
-                                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                animationDelay: `${index * 50}ms`
-                            }}
-                        >
-                            <div style={{
-                                maxWidth: '75%',
-                                padding: '1rem 1.25rem',
-                                borderRadius: '1rem',
-                                background: msg.role === 'user'
-                                    ? 'linear-gradient(135deg, #6366F1, #8B5CF6)'
-                                    : 'rgba(255, 255, 255, 0.05)',
-                                backdropFilter: msg.role === 'assistant' ? 'blur(10px)' : 'none',
-                                border: msg.role === 'assistant' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                                color: msg.role === 'user' ? 'white' : 'var(--text-main)',
-                                boxShadow: msg.role === 'user'
-                                    ? '0 4px 12px rgba(99, 102, 241, 0.3)'
-                                    : '0 4px 12px rgba(0, 0, 0, 0.1)',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                                fontSize: '0.95rem',
-                                lineHeight: '1.6'
-                            }}>
-                                {msg.content}
-                                <div style={{
-                                    fontSize: '0.75rem',
-                                    marginTop: '0.5rem',
-                                    opacity: 0.7,
-                                    fontWeight: 500
-                                }}>
-                                    {new Date(msg.timestamp).toLocaleTimeString('en-IN', {
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })}
-                                </div>
-                            </div>
-                        </div>
+                        <ChatMessage key={index} message={msg} />
                     ))}
                     {loading && (
                         <div style={{ display: 'flex', justifyContent: 'flex-start' }}>

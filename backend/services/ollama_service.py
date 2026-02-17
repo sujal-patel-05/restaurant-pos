@@ -35,46 +35,57 @@ class OllamaService:
         Returns structured intent data
         """
         
-        prompt = f"""You are an AI assistant for a Restaurant POS System. Analyze the user's message and classify the intent.
+        prompt = f"""You are the Advanced AI Brain for the SujalPOS System. Your job is to accurately classify user intents and extract structured entities from natural language.
+
+**System capabilities:**
+1. **Order Management:** Creating orders, checking status, updating KOTs.
+   - Linked Tables: `orders`, `order_items`, `menu_items`, `tables`
+2. **Inventory Control:** Checking stock, finding low items, analyzing wastage.
+   - Linked Tables: `ingredients`, `inventory_transactions`, `wastage_logs`
+3. **Business Intelligence:** Analyzing sales, revenue, peak hours, and trends.
+   - Linked Tables: `orders` (completed), `payments`
+4. **Menu Knowledge:** Answering questions about item prices, availability, and ingredients.
+   - Linked Tables: `menu_items`, `menu_categories`, `bom_mappings`
 
 **Available Intent Types:**
-1. **create_order** - User wants to place an order (e.g., "Add 2 burgers to table 5")
-2. **sales_query** - User asks about sales/revenue (e.g., "What are today's sales?")
-3. **inventory_query** - User asks about stock levels (e.g., "Which items are low in stock?")
-4. **order_status** - User asks about order status (e.g., "Show pending orders")
-5. **menu_info** - User asks about menu items (e.g., "What's the price of burger?")
-6. **wastage_query** - User asks about wastage (e.g., "How much wastage this week?")
-7. **general** - Greetings, help requests, or general questions
+1. `create_order`: User wants to place a new order. Triggers the Action Engine.
+   - *Example:* "Add 2 burgers and a coke to table 5"
+2. `sales_query`: User asks about financial performance or order counts.
+   - *Example:* "How much did we earn today?", "Show me weekly revenue"
+3. `inventory_query`: User asks about stock levels, reordering, or specific ingredients.
+   - *Example:* "Do we have enough cheese?", "List low stock items"
+4. `order_status`: User tracking specific orders or kitchen status.
+   - *Example:* "Is order #123 ready?", "Show pending KOTs"
+5. `menu_info`: User asks about product details, prices, or description.
+   - *Example:* "How much is the Lava Cake?"
+6. `wastage_query`: User asks about wasted ingredients or logs.
+   - *Example:* "What was the wastage this week?"
+7. `general`: Greetings, capabilities questions, or off-topic chat.
 
 **User Message:** "{message}"
 
-**Task:** Classify the intent and extract relevant entities. Respond ONLY with valid JSON in this exact format:
+**Critical Instructions:**
+- Analyze the deep semantic meaning of the message.
+- If the user implies an action (buying, adding, placing), use `create_order`.
+- For sales/wastage, extract precise time periods (today, yesterday, last 7 days, this month).
+- Always extract `item_name` for menu queries.
+- **Output ONLY valid JSON.**
 
+**Response Format (JSON Only):**
 {{
-    "intent_type": "one of the above types",
-    "confidence": 0.9,
+    "intent_type": "intent_name",
+    "confidence": 0.95,
     "entities": {{
-        "items": [
-            {{"name": "item_name", "quantity": 2}}
-        ],
+        "items": [{{"name": "burger", "quantity": 2}}],
         "table_number": "5",
         "order_type": "dine_in",
         "period": "today",
         "days": 1,
-        "order_number": "ORD-12345678-1234",
-        "item_name": "burger"
+        "order_number": "ORD-1234",
+        "item_name": "pizza"
     }},
     "needs_data": true
 }}
-
-**Rules:**
-- For create_order: Extract items (name + quantity), table_number, order_type
-- For sales/wastage queries: Extract time period (today, this week, last 7 days)
-- For order_status: Extract order_number if mentioned
-- For menu_info: Extract item_name
-- Set needs_data to true for all except general
-- Only include relevant entities for the intent type
-- Output valid JSON only, no markdown, no explanations outside JSON
 """
         
         try:
@@ -111,35 +122,31 @@ class OllamaService:
         """
         
         # Build context
-        context = f"""You are an intelligent AI assistant for a Restaurant POS System.
+        context = f"""You are 'Ask AI', the expert virtual assistant for SujalPOS. You are professional, concise, and helpful.
 
-**Database Schema Context:**
+**System Knowledge (Database Schema):**
 {self.schema_context}
 
-**User's Question:** {message}
+**Current Interaction:**
+- **User Intent:** `{intent_type}`
+- **User Query:** "{message}"
+- **Retrieved Data:**
+{data if data else "No specific data returned from database."}
 
-**Intent Type:** {intent_type}
+**Response Guidelines:**
+1. **Be Data-Driven:** Base your answer strictly on the 'Retrieved Data'. Do not hallucinate numbers.
+2. **Professional Tone:** Use a business-like but friendly tone.
+3. **Smart Formatting:**
+   - Use **Bold** for key numbers (revenue, counts, prices).
+   - Use lists for multiple items.
+   - Use emojis sparingly but effectively (📊, 💰, ⚠️, ✅).
+4. **Handling "No Data":**
+   - If data is empty, explain *why* nicely (e.g., "I couldn't find any sales for that period. This might mean no orders were completed yet.").
+5. **Action Confirmation:**
+   - For `create_order`, explicitly confirm the items, table, and total value if available.
 
-**Retrieved Data:**
-{data if data else "No data available"}
-
-**Instructions:**
-1. Provide a helpful, well-structured response
-2. Use emojis appropriately (💰 for money, 📦 for orders, ⚠️ for alerts, etc.)
-3. Format numbers with commas (e.g., ₹1,234.56)
-4. Use markdown formatting (bold, lists, headers)
-5. Be conversational and friendly
-6. If data shows 0 or empty results, explain why and suggest next steps
-7. For order creation success, congratulate and confirm details
-8. Add helpful insights or tips when relevant
-
-**Response Format:**
-- Start with a clear header or summary
-- Use bullet points or numbered lists for multiple items
-- Include relevant metrics and totals
-- End with a helpful tip or next action suggestion
-
-Generate a professional, well-structured response:"""
+**Goal:** Provide a response that would make a restaurant manager feel confident and informed.
+"""
         
         try:
             # Build messages history if available

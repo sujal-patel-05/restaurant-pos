@@ -13,3 +13,7 @@ alembic==1.13.1
 xhtml2pdf==0.2.15
 google-generativeai
 ollama
+groq
+crewai
+crewai-tools
+apscheduler

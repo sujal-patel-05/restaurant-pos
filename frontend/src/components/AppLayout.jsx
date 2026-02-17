@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { AIChatWidget } from './AIChatWidget';
+import {
+    LayoutDashboard,
+    ShoppingCart,
+    UtensilsCrossed,
+    ClipboardList,
+    Package,
+    BarChart3,
+    Sparkles,
+    LogOut,
+    Menu,
+    ChevronLeft,
+    ChevronRight,
+    ChefHat,
+    Brain
+} from 'lucide-react';
 
 // Reusable Layout Component
 export function AppLayout({ children, title, subtitle, actions }) {
@@ -22,14 +37,14 @@ export function AppLayout({ children, title, subtitle, actions }) {
     };
 
     const navItems = [
-        { path: '/', icon: '📊', label: 'Dashboard' },
-        { path: '/pos', icon: '🛒', label: 'POS Terminal' },
-        { path: '/kds', icon: '👨‍🍳', label: 'Kitchen Display' },
-        { path: '/menu', icon: '📋', label: 'Menu' },
-        { path: '/inventory', icon: '📦', label: 'Inventory' },
-        { path: '/billing', icon: '💳', label: 'Billing' },
-        { path: '/reports', icon: '📈', label: 'Reports' },
-        { path: '/ask-ai', icon: '🤖', label: 'Ask AI' },
+        { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+        { path: '/pos', icon: <ShoppingCart size={20} />, label: 'POS Terminal' },
+        { path: '/kds', icon: <ChefHat size={20} />, label: 'Kitchen Display' },
+        { path: '/menu', icon: <Menu size={20} />, label: 'Menu' },
+        { path: '/inventory', icon: <Package size={20} />, label: 'Inventory' },
+        { path: '/reports', icon: <BarChart3 size={20} />, label: 'Reports' },
+        { path: '/ask-ai', icon: <Sparkles size={20} />, label: 'Ask AI' },
+        { path: '/agents', icon: <Brain size={20} />, label: 'AI Insights' },
     ];
 
     return (
@@ -38,7 +53,9 @@ export function AppLayout({ children, title, subtitle, actions }) {
             <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <div className="sidebar-logo-icon">🍽️</div>
+                        <div className="sidebar-logo-icon">
+                            <UtensilsCrossed size={20} color="white" />
+                        </div>
                         <span>SujalPOS</span>
                     </div>
                 </div>
@@ -75,7 +92,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
                             transition: 'all 0.2s ease'
                         }}
                     >
-                        <span className="nav-item-icon">🚪</span>
+                        <span className="nav-item-icon"><LogOut size={20} /></span>
                         <span>Logout</span>
                     </button>
                     <button
@@ -83,7 +100,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
                         onClick={toggleSidebar}
                         title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
                     >
-                        {sidebarCollapsed ? '→' : '←'}
+                        {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
                     </button>
                 </div>
             </aside>
@@ -108,7 +125,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
                 </div>
             </main>
 
-            {/* Floating AI Chat Widget */}
+            {/* Floating AI Chat Widget - REMOVED as per user request to use Sidebar/Page instead */}
             {/* <AIChatWidget /> */}
         </div>
     );
