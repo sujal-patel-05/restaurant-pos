@@ -5,6 +5,7 @@ import { inventoryAPI } from '../services/api';
 function InventoryDashboard() {
     const [ingredients, setIngredients] = useState([]);
     const [lowStockAlerts, setLowStockAlerts] = useState([]);
+    const [expiryAlerts, setExpiryAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -16,7 +17,8 @@ function InventoryDashboard() {
         current_stock: '',
         reorder_level: '',
         cost_per_unit: '',
-        supplier: ''
+        supplier: '',
+        expiry_date: ''
     });
 
     useEffect(() => {
@@ -26,13 +28,15 @@ function InventoryDashboard() {
     const fetchInventoryData = async () => {
         try {
             setLoading(true);
-            const [ingredientsRes, alertsRes] = await Promise.all([
+            const [ingredientsRes, alertsRes, expiryRes] = await Promise.all([
                 inventoryAPI.getIngredients(),
-                inventoryAPI.getLowStockAlerts()
+                inventoryAPI.getLowStockAlerts(),
+                inventoryAPI.getExpiryAlerts ? inventoryAPI.getExpiryAlerts(30) : Promise.resolve({ data: [] })
             ]);
 
             setIngredients(ingredientsRes.data || []);
             setLowStockAlerts(alertsRes.data || []);
+            setExpiryAlerts(expiryRes.data || []);
         } catch (error) {
             console.error('Error fetching inventory data:', error);
             alert('Error loading inventory. Please refresh the page.');
@@ -49,7 +53,8 @@ function InventoryDashboard() {
                 current_stock: parseFloat(ingredientForm.current_stock),
                 reorder_level: parseFloat(ingredientForm.reorder_level),
                 cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0,
-                supplier: ingredientForm.supplier
+                supplier: ingredientForm.supplier,
+                expiry_date: ingredientForm.expiry_date || null
             };
 
             await inventoryAPI.createIngredient(data);
@@ -71,7 +76,8 @@ function InventoryDashboard() {
                 current_stock: parseFloat(ingredientForm.current_stock),
                 reorder_level: parseFloat(ingredientForm.reorder_level),
                 cost_per_unit: parseFloat(ingredientForm.cost_per_unit) || 0,
-                supplier: ingredientForm.supplier
+                supplier: ingredientForm.supplier,
+                expiry_date: ingredientForm.expiry_date || null
             };
 
             await inventoryAPI.updateIngredient(editingItem.id, data);
@@ -94,7 +100,8 @@ function InventoryDashboard() {
             current_stock: ingredient.current_stock.toString(),
             reorder_level: ingredient.reorder_level.toString(),
             cost_per_unit: ingredient.cost_per_unit?.toString() || '0',
-            supplier: ingredient.supplier || ''
+            supplier: ingredient.supplier || '',
+            expiry_date: ingredient.expiry_date || ''
         });
         setShowEditModal(true);
     };
@@ -121,9 +128,35 @@ function InventoryDashboard() {
             current_stock: '',
             reorder_level: '',
             cost_per_unit: '',
-            supplier: ''
+            supplier: '',
+            expiry_date: ''
         });
     };
+
+    // Expiry helpers
+    const getExpiryStatus = (expiryDate) => {
+        if (!expiryDate) return { label: 'No Expiry', color: 'var(--text-secondary)', bg: 'transparent', icon: '—' };
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiry = new Date(expiryDate);
+        const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) return { label: 'Expired', color: '#dc2626', bg: '#fef2f2', icon: '🔴', days: diffDays };
+        if (diffDays <= 3) return { label: `${diffDays}d left`, color: '#dc2626', bg: '#fef2f2', icon: '🔴', days: diffDays };
+        if (diffDays <= 7) return { label: `${diffDays}d left`, color: '#ea580c', bg: '#fff7ed', icon: '🟠', days: diffDays };
+        if (diffDays <= 30) return { label: `${diffDays}d left`, color: '#d97706', bg: '#fffbeb', icon: '🟡', days: diffDays };
+        return { label: `${diffDays}d left`, color: '#16a34a', bg: '#f0fdf4', icon: '🟢', days: diffDays };
+    };
+
+    const expiredCount = ingredients.filter(i => {
+        if (!i.expiry_date) return false;
+        return new Date(i.expiry_date) < new Date();
+    }).length;
+
+    const expiringSoonCount = ingredients.filter(i => {
+        if (!i.expiry_date) return false;
+        const diff = Math.ceil((new Date(i.expiry_date) - new Date()) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 7;
+    }).length;
 
     const inventoryValue = ingredients.reduce((sum, item) =>
         sum + (item.current_stock * (item.cost_per_unit || 0)), 0
@@ -178,6 +211,40 @@ function InventoryDashboard() {
                         </div>
                     )}
 
+                    {/* Expiry Alerts */}
+                    {(expiredCount > 0 || expiringSoonCount > 0) && (
+                        <div className="fade-in-up" style={{
+                            marginBottom: '2rem',
+                            background: expiredCount > 0 ? '#fef2f2' : '#fff7ed',
+                            border: `1px solid ${expiredCount > 0 ? '#fca5a5' : '#fdba74'}`,
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '1rem 1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            color: expiredCount > 0 ? '#991b1b' : '#92400E'
+                        }}>
+                            <span style={{ fontSize: '1.5rem' }}>{expiredCount > 0 ? '🔴' : '🟠'}</span>
+                            <div>
+                                <strong style={{ fontWeight: 600 }}>Expiry Alert:</strong>
+                                {expiredCount > 0 && ` ${expiredCount} item(s) expired!`}
+                                {expiringSoonCount > 0 && ` ${expiringSoonCount} item(s) expiring within 7 days.`}
+                                <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', opacity: 0.9 }}>
+                                    {ingredients.filter(i => {
+                                        if (!i.expiry_date) return false;
+                                        const diff = Math.ceil((new Date(i.expiry_date) - new Date()) / (1000 * 60 * 60 * 24));
+                                        return diff <= 7;
+                                    }).slice(0, 4).map(i => i.name).join(', ')}
+                                    {ingredients.filter(i => {
+                                        if (!i.expiry_date) return false;
+                                        const diff = Math.ceil((new Date(i.expiry_date) - new Date()) / (1000 * 60 * 60 * 24));
+                                        return diff <= 7;
+                                    }).length > 4 && ' and more'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Stats */}
                     <div className="stats-grid mb-xl">
                         <div className="stat-card fade-in-up" style={{ animationDelay: '0ms' }}>
@@ -209,6 +276,17 @@ function InventoryDashboard() {
                                 <div className="stat-card-icon blue" style={{ marginBottom: 0 }}>💰</div>
                             </div>
                         </div>
+                        <div className="stat-card fade-in-up" style={{ animationDelay: '300ms' }}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="stat-card-label">Expiring Soon</div>
+                                    <div className="stat-card-value" style={{ color: (expiredCount + expiringSoonCount) > 0 ? '#dc2626' : 'inherit' }}>
+                                        {expiredCount + expiringSoonCount}
+                                    </div>
+                                </div>
+                                <div className="stat-card-icon red" style={{ marginBottom: 0 }}>📅</div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Inventory Table */}
@@ -237,6 +315,7 @@ function InventoryDashboard() {
                                             <th>Unit</th>
                                             <th>Reorder Level</th>
                                             <th>Cost/Unit</th>
+                                            <th>Expiry Date</th>
                                             <th>Supplier</th>
                                             <th>Status</th>
                                             <th>Actions</th>
@@ -245,6 +324,7 @@ function InventoryDashboard() {
                                     <tbody>
                                         {ingredients.map(item => {
                                             const isLowStock = item.current_stock <= item.reorder_level;
+                                            const expiry = getExpiryStatus(item.expiry_date);
                                             return (
                                                 <tr key={item.id}>
                                                     <td style={{ fontWeight: 500 }}>{item.name}</td>
@@ -255,6 +335,23 @@ function InventoryDashboard() {
                                                     <td style={{ color: 'var(--text-secondary)' }}>{item.reorder_level}</td>
                                                     <td style={{ fontFamily: 'var(--font-mono)' }}>
                                                         ₹{item.cost_per_unit ? parseFloat(item.cost_per_unit).toFixed(2) : '0.00'}
+                                                    </td>
+                                                    <td>
+                                                        {item.expiry_date ? (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ fontSize: '0.75rem' }}>{expiry.icon}</span>
+                                                                <div>
+                                                                    <div style={{ fontSize: '0.85rem', fontFamily: 'var(--font-mono)', color: expiry.color, fontWeight: 600 }}>
+                                                                        {new Date(item.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '0.7rem', color: expiry.color, opacity: 0.8 }}>
+                                                                        {expiry.label}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>—</span>
+                                                        )}
                                                     </td>
                                                     <td style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                                                         {item.supplier || '-'}
@@ -371,17 +468,27 @@ function InventoryDashboard() {
                                 </div>
                             </div>
 
-                            <div className="form-group mb-xl">
-                                <label className="form-label">Supplier Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={ingredientForm.supplier}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
-                                    placeholder="e.g., ABC Suppliers"
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Supplier Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={ingredientForm.supplier}
+                                        onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
+                                        placeholder="e.g., ABC Suppliers"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Expiry Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={ingredientForm.expiry_date}
+                                        onChange={(e) => setIngredientForm({ ...ingredientForm, expiry_date: e.target.value })}
+                                    />
+                                </div>
                             </div>
-
 
 
                             <div className="flex gap-md" style={{ justifyContent: 'flex-end' }}>
@@ -471,16 +578,26 @@ function InventoryDashboard() {
                                 </div>
                             </div>
 
-                            <div className="form-group mb-xl">
-                                <label className="form-label">Supplier Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={ingredientForm.supplier}
-                                    onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Supplier Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={ingredientForm.supplier}
+                                        onChange={(e) => setIngredientForm({ ...ingredientForm, supplier: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Expiry Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={ingredientForm.expiry_date}
+                                        onChange={(e) => setIngredientForm({ ...ingredientForm, expiry_date: e.target.value })}
+                                    />
+                                </div>
                             </div>
-
 
 
                             <div className="flex gap-md" style={{ justifyContent: 'flex-end' }}>

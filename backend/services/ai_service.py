@@ -82,8 +82,41 @@ class AIService:
         """Rule-based intent classification (fallback)"""
         message_lower = message.lower()
         
-        # Order creation (ACTION)
-        if any(word in message_lower for word in ['add', 'order', 'i want', 'get me', 'place order']):
+        # Detect analytical/query keywords — these mean the user is ASKING, not ORDERING
+        is_analytical = any(word in message_lower for word in [
+            'total', 'how many', 'how much', 'count', 'compare', 'trend',
+            'average', 'best selling', 'top selling', 'peak', 'report',
+            'this week', 'this month', 'today', 'yesterday', 'last week',
+            'last month', 'summary', 'analysis', 'insight', 'performance',
+            'growth', 'forecast', 'profit', 'loss', 'aov', 'daily'
+        ])
+        
+        # 1. Sales / analytics queries (CHECK FIRST — before order creation)
+        sales_keywords = ['sales', 'revenue', 'earning', 'income', 'total order',
+                         'how many order', 'order count', 'best selling', 'top selling',
+                         'peak hour', 'aov', 'average order', 'compare', 'trend',
+                         'performance', 'growth', 'forecast', 'profit']
+        if any(word in message_lower for word in sales_keywords) or \
+           (is_analytical and 'order' in message_lower):
+            entities = self._extract_time_period(message_lower)
+            return Intent(
+                intent_type="sales_query",
+                confidence=0.9,
+                entities=entities,
+                needs_data=True
+            )
+        
+        # 2. Inventory queries (including expiry)
+        if any(word in message_lower for word in ['stock', 'inventory', 'ingredient', 'low stock', 'reorder', 'expiry', 'expiring', 'expire', 'shelf life', 'expiration']):
+            return Intent(
+                intent_type="inventory_query",
+                confidence=0.9,
+                entities={},
+                needs_data=True
+            )
+        
+        # 3. Order creation (ACTION) — only if NOT analytical
+        if not is_analytical and any(word in message_lower for word in ['add', 'order', 'i want', 'get me', 'place order']):
             entities = self._extract_order_items(message)
             if entities.get('items'):
                 return Intent(
@@ -93,27 +126,8 @@ class AIService:
                     needs_data=True
                 )
         
-        # Sales queries
-        if any(word in message_lower for word in ['sales', 'revenue', 'earning', 'income', 'total']):
-            entities = self._extract_time_period(message_lower)
-            return Intent(
-                intent_type="sales_query",
-                confidence=0.9,
-                entities=entities,
-                needs_data=True
-            )
-        
-        # Inventory queries
-        if any(word in message_lower for word in ['stock', 'inventory', 'ingredient', 'low stock', 'reorder']):
-            return Intent(
-                intent_type="inventory_query",
-                confidence=0.9,
-                entities={},
-                needs_data=True
-            )
-        
-        # Order status
-        if any(word in message_lower for word in ['order', 'pending', 'kot', 'kitchen']):
+        # 4. Order status
+        if any(word in message_lower for word in ['order status', 'pending', 'kot', 'kitchen', 'active order']):
             order_number = self._extract_order_number(message)
             return Intent(
                 intent_type="order_status",
@@ -122,8 +136,8 @@ class AIService:
                 needs_data=True
             )
         
-        # Menu queries
-        if any(word in message_lower for word in ['menu', 'item', 'dish', 'price', 'available']):
+        # 5. Menu queries
+        if any(word in message_lower for word in ['menu', 'dish', 'price', 'available']):
             item_name = self._extract_item_name(message)
             return Intent(
                 intent_type="menu_info",
@@ -132,8 +146,8 @@ class AIService:
                 needs_data=True
             )
         
-        # Wastage queries
-        if any(word in message_lower for word in ['wastage', 'waste', 'expired', 'damaged']):
+        # 6. Wastage queries
+        if any(word in message_lower for word in ['wastage', 'waste', 'damaged']):
             entities = self._extract_time_period(message_lower)
             return Intent(
                 intent_type="wastage_query",
@@ -142,7 +156,7 @@ class AIService:
                 needs_data=True
             )
         
-        # General/greeting
+        # 7. General/greeting
         return Intent(
             intent_type="general",
             confidence=0.5,
@@ -373,19 +387,19 @@ class AIService:
         message_lower = message.lower()
         
         if any(word in message_lower for word in ['hello', 'hi', 'hey']):
-            return "Hello! I'm your POS assistant. I can help you with sales reports, inventory status, order tracking, and menu information. What would you like to know?"
+            return "Hello! I'm your POS assistant. I can help you with sales reports, inventory & expiry tracking, order management, and menu information. What would you like to know?"
         
         if any(word in message_lower for word in ['help', 'what can you do']):
             return """I can help you with:
-- Sales reports (e.g., "What are today's sales?")
-- Inventory status (e.g., "Which items are low in stock?")
+- Sales reports (e.g., "What are today's sales?", "Compare this week vs last week")
+- Inventory & expiry tracking (e.g., "Which items are expiring soon?", "Show low stock items")
 - Order tracking (e.g., "Show me pending orders")
 - Menu information (e.g., "What's the price of burger?")
 - Wastage analysis (e.g., "How much wastage this week?")
 
 Just ask me a question!"""
         
-        return "I'm here to help! You can ask me about sales, inventory, orders, menu items, or wastage."
+        return "I'm here to help! You can ask me about sales, inventory, expiry dates, orders, menu items, or wastage."
     
     def _format_create_order_response(self, data: Dict[str, Any]) -> str:
         """Format order creation response"""
@@ -465,30 +479,52 @@ Just ask me a question!"""
         return response
     
     def _format_inventory_response(self, data: Dict[str, Any]) -> str:
-        """Format inventory data into natural language"""
+        """Format inventory data into natural language (low stock + expiry)"""
         low_stock_items = data.get('low_stock_items', [])
+        expired_items = data.get('expired_items', [])
+        expiring_soon = data.get('expiring_soon_items', [])
+        risk_value = data.get('total_expiry_risk_value', 0)
         
-        if not low_stock_items:
-            return "✅ **Good news!** All your inventory items are well-stocked. No items need reordering at the moment."
+        parts = []
         
-        response = f"⚠️ **Inventory Alert**\n\n"
-        response += f"I found **{len(low_stock_items)} item{'s' if len(low_stock_items) != 1 else ''}** "
-        response += f"running low on stock:\n\n"
+        # Expired items
+        if expired_items:
+            section = f"🔴 **Expired Items ({len(expired_items)})**\n\n"
+            for i, item in enumerate(expired_items[:5], 1):
+                section += f"{i}. **{item['name']}**: expired {abs(item['days_until_expiry'])} days ago "
+                section += f"({item['current_stock']} {item['unit']} @ ₹{item['cost_per_unit']:,.2f}/unit — ₹{item['risk_value']:,.2f} at risk)\n"
+            parts.append(section)
         
-        for i, item in enumerate(low_stock_items[:5], 1):
-            name = item.get('name', 'Unknown')
-            current = item.get('current_stock', 0)
-            reorder = item.get('reorder_level', 0)
-            unit = item.get('unit', '')
-            
-            response += f"{i}. **{name}**: {current}{unit} remaining "
-            response += f"(reorder threshold: {reorder}{unit})\n"
+        # Expiring soon
+        if expiring_soon:
+            section = f"🟠 **Expiring Within 7 Days ({len(expiring_soon)})**\n\n"
+            for i, item in enumerate(expiring_soon[:5], 1):
+                section += f"{i}. **{item['name']}**: {item['days_until_expiry']} day(s) left — expires {item['expiry_date']} "
+                section += f"({item['current_stock']} {item['unit']} — ₹{item['risk_value']:,.2f} at risk)\n"
+            parts.append(section)
         
-        if len(low_stock_items) > 5:
-            response += f"\n...and {len(low_stock_items) - 5} more items\n"
+        # Risk value
+        if risk_value > 0:
+            parts.append(f"💸 **Total Expiry Risk**: ₹{risk_value:,.2f} worth of stock at risk\n")
         
-        response += "\n💡 **Recommendation**: Consider placing orders for these items soon to avoid stockouts."
+        # Low stock items
+        if low_stock_items:
+            section = f"⚠️ **Low Stock Items ({len(low_stock_items)})**\n\n"
+            for i, item in enumerate(low_stock_items[:5], 1):
+                name = item.get('name', 'Unknown')
+                current = item.get('current_stock', 0)
+                reorder = item.get('reorder_level', 0)
+                unit = item.get('unit', '')
+                section += f"{i}. **{name}**: {current}{unit} remaining (reorder threshold: {reorder}{unit})\n"
+            if len(low_stock_items) > 5:
+                section += f"\n...and {len(low_stock_items) - 5} more items\n"
+            parts.append(section)
         
+        if not parts:
+            return "✅ **Good news!** All inventory items are well-stocked and no items are near expiry!"
+        
+        response = "📦 **Inventory & Expiry Report**\n\n" + "\n".join(parts)
+        response += "\n💡 **Recommendation**: Address expired items immediately and plan to use expiring-soon items first."
         return response
     
     def _format_order_response(self, data: Dict[str, Any], entities: Dict[str, Any]) -> str:

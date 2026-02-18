@@ -18,6 +18,7 @@ class IngredientCreate(IngredientBase):
 
 class IngredientUpdate(BaseModel):
     name: Optional[str] = None
+    unit: Optional[UnitType] = None
     current_stock: Optional[float] = None
     reorder_level: Optional[float] = None
     cost_per_unit: Optional[float] = None

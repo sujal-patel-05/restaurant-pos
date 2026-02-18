@@ -136,13 +136,48 @@ class QueryEngine:
     
     @staticmethod
     def _query_inventory(db: Session, restaurant_id: str) -> Dict[str, Any]:
-        """Query low stock items"""
+        """Query inventory: low stock + expiry alerts"""
+        from datetime import date
+        today = date.today()
+        
+        # Low stock items
         low_stock_items = db.query(Ingredient).filter(
             and_(
                 Ingredient.restaurant_id == restaurant_id,
                 Ingredient.current_stock <= Ingredient.reorder_level
             )
         ).all()
+        
+        # All ingredients (for expiry info)
+        all_ingredients = db.query(Ingredient).filter(
+            Ingredient.restaurant_id == restaurant_id
+        ).all()
+        
+        # Expiry analysis
+        expired = []
+        expiring_soon = []  # within 7 days
+        all_with_expiry = []
+        
+        for item in all_ingredients:
+            if item.expiry_date:
+                days_left = (item.expiry_date - today).days
+                info = {
+                    "name": item.name,
+                    "current_stock": float(item.current_stock),
+                    "unit": item.unit.value,
+                    "expiry_date": str(item.expiry_date),
+                    "days_until_expiry": days_left,
+                    "cost_per_unit": float(item.cost_per_unit or 0),
+                    "risk_value": round(float(item.current_stock) * float(item.cost_per_unit or 0), 2)
+                }
+                all_with_expiry.append(info)
+                if days_left < 0:
+                    expired.append(info)
+                elif days_left <= 7:
+                    expiring_soon.append(info)
+        
+        # Sort by soonest expiry
+        all_with_expiry.sort(key=lambda x: x["days_until_expiry"])
         
         return {
             "low_stock_items": [
@@ -153,7 +188,12 @@ class QueryEngine:
                     "unit": item.unit.value
                 }
                 for item in low_stock_items
-            ]
+            ],
+            "expired_items": expired,
+            "expiring_soon_items": expiring_soon,
+            "all_items_with_expiry": all_with_expiry,
+            "total_expiry_risk_value": sum(i["risk_value"] for i in expiring_soon + expired),
+            "total_ingredients": len(all_ingredients)
         }
     
     @staticmethod

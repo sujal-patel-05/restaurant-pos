@@ -76,7 +76,7 @@ INTENT_CLASSIFICATION_PROMPT = """Classify this restaurant POS message into exac
 |--------|-------------|---------|
 | `create_order` | Place/add items to an order | "Add 2 burgers to table 5" |
 | `sales_query` | Revenue, earnings, order counts, trends | "How much did we earn today?" |
-| `inventory_query` | Stock levels, ingredients, low stock | "Do we have enough cheese?" |
+| `inventory_query` | Stock levels, ingredients, low stock, expiry dates | "Do we have enough cheese?", "What's expiring soon?" |
 | `order_status` | Check/find specific orders | "Is order #123 ready?" |
 | `menu_info` | Item prices, availability, menu details | "How much is the pizza?" |
 | `wastage_query` | Waste logs, spoilage, food waste | "What was wasted this week?" |
@@ -92,6 +92,9 @@ User: "How much wastage happened last week?" → {{"intent_type":"wastage_query"
 User: "Hello!" → {{"intent_type":"general","confidence":0.99,"entities":{{}},"needs_data":false}}
 User: "What's the revenue for this month?" → {{"intent_type":"sales_query","confidence":0.96,"entities":{{"period":"this_month","days":30}},"needs_data":true}}
 User: "Which items are running low?" → {{"intent_type":"inventory_query","confidence":0.94,"entities":{{}},"needs_data":true}}
+User: "What's expiring soon?" → {{"intent_type":"inventory_query","confidence":0.95,"entities":{{}},"needs_data":true}}
+User: "Show me expired items" → {{"intent_type":"inventory_query","confidence":0.95,"entities":{{}},"needs_data":true}}
+User: "Which ingredients are about to expire?" → {{"intent_type":"inventory_query","confidence":0.96,"entities":{{}},"needs_data":true}}
 
 ## Time Period Extraction Rules
 - "today" → period: "today", days: 1
