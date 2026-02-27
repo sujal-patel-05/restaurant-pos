@@ -23,7 +23,7 @@ from database import SessionLocal, engine, Base
 from models import (
     MenuItem, Restaurant, Order, OrderItem, Payment, KOT
 )
-from models.order import OrderStatus, OrderType
+from models.order import OrderStatus, OrderType, OrderSource
 from models.billing import PaymentMode
 
 # ── CONFIG ──────────────────────────────────────────────────────
@@ -50,6 +50,14 @@ ORDER_TYPES = [
     (OrderType.DINE_IN,  0.50),
     (OrderType.TAKEAWAY,  0.30),
     (OrderType.DELIVERY,  0.20),
+]
+
+# Order source weights (POS vs Online platforms)
+# ~30% of all orders come from online aggregators
+ORDER_SOURCES = [
+    (OrderSource.POS,     0.70),
+    (OrderSource.ZOMATO,  0.18),
+    (OrderSource.SWIGGY,  0.12),
 ]
 
 # Payment mode weights
@@ -202,13 +210,24 @@ def generate():
                 hour, minute, second
             )
 
-            # Order type
-            order_type = weighted_choice(ORDER_TYPES)
+            # Order type & source
+            order_source = weighted_choice(ORDER_SOURCES)
+            if order_source in (OrderSource.ZOMATO, OrderSource.SWIGGY):
+                order_type = OrderType.DELIVERY  # Online = always delivery
+            else:
+                order_type = weighted_choice(ORDER_TYPES)
 
             # Customer
             cust_name = f"{random.choice(CUSTOMER_FIRST)} {random.choice(CUSTOMER_LAST)}"
             cust_phone = random_phone() if random.random() < 0.6 else None
             table_num = random.choice(TABLE_NUMBERS) if order_type == OrderType.DINE_IN else None
+
+            # Platform order ID for online orders
+            platform_id = None
+            if order_source == OrderSource.ZOMATO:
+                platform_id = f"ZMT-{random.randint(100000, 999999)}"
+            elif order_source == OrderSource.SWIGGY:
+                platform_id = f"SWG-{random.randint(100000, 999999)}"
 
             # Status
             is_cancelled = random.random() < CANCEL_RATE
@@ -258,8 +277,10 @@ def generate():
                 restaurant_id=rid,
                 order_number=f"ORD-{current_date.strftime('%Y%m%d')}-{i+1:04d}",
                 order_type=order_type,
+                order_source=order_source,
                 status=status,
                 table_number=table_num,
+                platform_order_id=platform_id,
                 customer_name=cust_name,
                 customer_phone=cust_phone,
                 subtotal=subtotal,

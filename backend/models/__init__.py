@@ -2,9 +2,10 @@
 from models.restaurant import Restaurant, User, UserRole
 from models.menu import MenuCategory, MenuItem
 from models.inventory import Ingredient, BOMMaping, InventoryTransaction, WastageLog, UnitType
-from models.order import Order, OrderItem, KOT, OrderStatus, OrderType
+from models.order import Order, OrderItem, KOT, OrderStatus, OrderType, OrderSource
 from models.billing import Payment, Invoice, Discount, PaymentMode
 from models.analytics import DailySummary
+from models.table_session import TableConfig, TableSession, VoiceOrderLog, SessionStatus
 
 __all__ = [
     "Restaurant",
@@ -22,6 +23,7 @@ __all__ = [
     "KOT",
     "OrderStatus",
     "OrderType",
+    "OrderSource",
     "Payment",
     "Invoice",
     "Discount",

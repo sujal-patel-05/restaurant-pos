@@ -1,13 +1,16 @@
 """
 APScheduler Service for SujalPOS
-Runs daily agent analysis at 8 AM IST and emails the brief to the restaurant owner
+- Daily agent analysis at 8 AM IST
+- Simulated online orders every 3-7 minutes
 """
 
 import os
 import logging
+import random
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +75,44 @@ def daily_planning_job():
         logger.error(traceback.format_exc())
 
 
+def online_order_job():
+    """
+    Generate a simulated Zomato/Swiggy order.
+    Runs every 3-7 minutes (randomized interval for realism).
+    """
+    try:
+        from database import SessionLocal
+        from models import Restaurant
+        from services.online_order_service import OnlineOrderService
+
+        db = SessionLocal()
+        try:
+            # Get first restaurant
+            restaurant = db.query(Restaurant).first()
+            if not restaurant:
+                return
+
+            result = OnlineOrderService.generate_online_order(db, str(restaurant.id))
+            if result:
+                src = result['source'].upper()
+                logger.info(
+                    f"🔔 [{src}] New online order #{result['order_number']} "
+                    f"— ₹{result['total_amount']:.0f} ({result['items_count']} items)"
+                )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Online order generation failed: {e}")
+
+
 def start_scheduler():
     """
-    Start the APScheduler with a daily 8 AM IST cron trigger.
-    Returns the scheduler instance.
+    Start the APScheduler with:
+    - Daily 8 AM cron for agent analysis
+    - Every 5 minutes interval for online order simulation
     """
     schedule_hour = int(os.getenv("AGENT_SCHEDULE_HOUR", "8"))
+    online_interval = int(os.getenv("ONLINE_ORDER_INTERVAL_MINUTES", "5"))
     
     scheduler = BackgroundScheduler()
     
@@ -90,8 +125,18 @@ def start_scheduler():
         replace_existing=True
     )
     
+    # Schedule online order generation every N minutes
+    scheduler.add_job(
+        online_order_job,
+        trigger=IntervalTrigger(minutes=online_interval),
+        id="online_order_simulation",
+        name="Online Order Simulation (Zomato/Swiggy)",
+        replace_existing=True
+    )
+    
     scheduler.start()
     logger.info(f"⏰ Scheduler started — Daily brief at {schedule_hour}:00 AM")
+    logger.info(f"🛵 Online orders will arrive every {online_interval} min")
     
     return scheduler
 
@@ -101,3 +146,4 @@ def stop_scheduler(scheduler):
     if scheduler:
         scheduler.shutdown()
         logger.info("⏰ Scheduler stopped")
+

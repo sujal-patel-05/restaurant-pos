@@ -15,7 +15,8 @@ function ReportsDashboard() {
         items: [],
         peakHours: [],
         ingredients: [],
-        wastage: null
+        wastage: null,
+        onlineVsOffline: null,
     });
 
     useEffect(() => {
@@ -25,12 +26,13 @@ function ReportsDashboard() {
     const fetchReports = async () => {
         setLoading(true);
         try {
-            const [salesData, itemsData, peakHoursData, ingredientsData, wastageData] = await Promise.all([
+            const [salesData, itemsData, peakHoursData, ingredientsData, wastageData, onlineOfflineData] = await Promise.all([
                 reportsAPI.getSalesReport(dateRange),
                 reportsAPI.getItemWiseSales(dateRange),
                 reportsAPI.getPeakHours(dateRange),
                 reportsAPI.getIngredientUsage(dateRange),
-                reportsAPI.getWastageReport(dateRange)
+                reportsAPI.getWastageReport(dateRange),
+                reportsAPI.getOnlineVsOffline(dateRange),
             ]);
 
             setStats({
@@ -38,7 +40,8 @@ function ReportsDashboard() {
                 items: itemsData.data.items,
                 peakHours: peakHoursData.data.peak_hours,
                 ingredients: ingredientsData.data.ingredients,
-                wastage: wastageData.data
+                wastage: wastageData.data,
+                onlineVsOffline: onlineOfflineData.data,
             });
         } catch (error) {
             console.error("Error fetching reports:", error);
@@ -48,6 +51,7 @@ function ReportsDashboard() {
     };
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+    const ONLINE_COLORS = ['#6366f1', '#E23744', '#FC8019'];  // POS, Zomato, Swiggy
 
     const actions = (
         <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
@@ -293,6 +297,108 @@ function ReportsDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Online vs Offline Section ── */}
+            {stats.onlineVsOffline && (
+                <>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginTop: '2rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🌐 Online vs Offline Orders
+                    </h2>
+
+                    {/* Stat Cards Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                        {/* Online % Card */}
+                        <div className="stat-card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.2rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Online Share</div>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#6366f1' }}>{stats.onlineVsOffline.online_percentage}%</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                {stats.onlineVsOffline.online?.count || 0} of {stats.onlineVsOffline.total_orders} orders
+                            </div>
+                        </div>
+                        {/* Zomato Card */}
+                        <div className="stat-card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.2rem', border: '1px solid rgba(226, 55, 68, 0.2)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>🔴 Zomato</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#E23744' }}>₹{(stats.onlineVsOffline.zomato?.revenue || 0).toLocaleString()}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{stats.onlineVsOffline.zomato?.count || 0} orders</div>
+                        </div>
+                        {/* Swiggy Card */}
+                        <div className="stat-card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.2rem', border: '1px solid rgba(252, 128, 25, 0.2)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>🟠 Swiggy</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FC8019' }}>₹{(stats.onlineVsOffline.swiggy?.revenue || 0).toLocaleString()}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{stats.onlineVsOffline.swiggy?.count || 0} orders</div>
+                        </div>
+                        {/* Offline Card */}
+                        <div className="stat-card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.2rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>🏪 POS / Walk-in</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#6366f1' }}>₹{(stats.onlineVsOffline.offline?.revenue || 0).toLocaleString()}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{stats.onlineVsOffline.offline?.count || 0} orders</div>
+                        </div>
+                    </div>
+
+                    {/* Charts Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+                        {/* Platform Distribution Pie Chart */}
+                        <div className="card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-primary)' }}>Order Source Distribution</h3>
+                            <ResponsiveContainer width="100%" height={280}>
+                                <PieChart>
+                                    <Pie
+                                        data={stats.onlineVsOffline.platform_split?.data || []}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        nameKey="label"
+                                        label={({ label, percent }) => `${label} ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {(stats.onlineVsOffline.platform_split?.data || []).map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={ONLINE_COLORS[index % ONLINE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'var(--card-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: 'var(--radius-lg)',
+                                            boxShadow: 'var(--shadow-lg)'
+                                        }}
+                                    />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Daily Online vs Offline Trend */}
+                        <div className="card" style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-primary)' }}>Daily Online vs Offline Trend</h3>
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={stats.onlineVsOffline.daily_trend || []}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
+                                        tickFormatter={d => d ? d.slice(5) : ''}
+                                    />
+                                    <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'var(--card-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: 'var(--radius-lg)'
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="offline" name="POS / Walk-in" fill="#6366f1" stackId="a" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="zomato" name="Zomato" fill="#E23744" stackId="a" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="swiggy" name="Swiggy" fill="#FC8019" stackId="a" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </>
+            )}
         </AppLayout>
     );
 }

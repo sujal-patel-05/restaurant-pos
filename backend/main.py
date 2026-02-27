@@ -8,6 +8,7 @@ import os
 # Import routes
 from routes import auth, menu, inventory, orders, kds, billing, reports, ai
 from routes import agents as agents_route
+from routes.customer import router as customer_router, admin_router as table_admin_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -19,10 +20,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS - allow all origins for customer table devices
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +31,7 @@ app.add_middleware(
 
 # Create public directory if it doesn't exist
 os.makedirs("public/images/menu_items", exist_ok=True)
+os.makedirs("temp_audio", exist_ok=True)
 
 # Mount static files
 app.mount("/public", StaticFiles(directory="public"), name="public")
@@ -44,6 +46,8 @@ app.include_router(billing.router)
 app.include_router(reports.router)
 app.include_router(ai.router)
 app.include_router(agents_route.router)
+app.include_router(customer_router)
+app.include_router(table_admin_router)
 
 # Scheduler for daily agent analysis
 _scheduler = None
@@ -54,9 +58,17 @@ async def startup_event():
     try:
         from services.scheduler import start_scheduler
         _scheduler = start_scheduler()
-        print("⏰ Daily Planning Scheduler started")
+        print("[SCHEDULER] Daily Planning Scheduler started")
     except Exception as e:
-        print(f"⚠️ Scheduler failed to start: {e}")
+        print(f"[WARN] Scheduler failed to start: {e}")
+    
+    # Load Whisper model for voice ordering
+    try:
+        from services.whisper_engine import whisper_engine
+        whisper_engine.load_model()
+        print("[WHISPER] Voice ordering model loaded successfully")
+    except Exception as e:
+        print(f"[WARN] Whisper model failed to load (voice ordering disabled): {e}")
     
     # Backfill daily summaries on startup
     try:
@@ -67,9 +79,9 @@ async def startup_event():
         for restaurant in restaurants:
             SnapshotService.backfill_missing_days(db, str(restaurant.id), lookback_days=30)
         db.close()
-        print(f"📊 Daily summaries backfilled for {len(restaurants)} restaurant(s)")
+        print(f"[SNAPSHOT] Daily summaries backfilled for {len(restaurants)} restaurant(s)")
     except Exception as e:
-        print(f"⚠️ Snapshot backfill failed: {e}")
+        print(f"[WARN] Snapshot backfill failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -77,7 +89,7 @@ async def shutdown_event():
     if _scheduler:
         from services.scheduler import stop_scheduler
         stop_scheduler(_scheduler)
-        print("⏰ Scheduler stopped")
+        print("[SCHEDULER] Scheduler stopped")
 
 @app.get("/")
 def root():

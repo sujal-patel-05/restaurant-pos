@@ -82,9 +82,13 @@ function KDSContent() {
     };
 
     const getElapsedTime = (createdStr) => {
-        const created = new Date(createdStr);
+        if (!createdStr) return 0;
+        // Backend stores UTC times without 'Z' suffix — append it so JS parses as UTC
+        let ts = createdStr;
+        if (!ts.endsWith('Z') && !ts.includes('+')) ts += 'Z';
+        const created = new Date(ts);
         const diff = Math.floor((currentTime - created) / 1000 / 60); // minutes
-        return diff;
+        return Math.max(0, diff);
     };
 
     const getStatusColor = (status) => {
@@ -177,9 +181,21 @@ function KDSContent() {
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                     <h3 style={{ margin: 0 }}>#{kot.kot_number || (kot.id && kot.id.toString().slice(0, 6)) || '???'}</h3>
-                                    <span className={`badge ${getStatusBadgeClass(kot.status)}`}>
-                                        {kot.status?.toUpperCase() || 'UNKNOWN'}
-                                    </span>
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        {kot.order?.order_source === 'voice_table' && (
+                                            <span style={{
+                                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                                color: '#fff',
+                                                padding: '0.2rem 0.5rem',
+                                                borderRadius: '6px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 600,
+                                            }}>🎤 Voice Order</span>
+                                        )}
+                                        <span className={`badge ${getStatusBadgeClass(kot.status)}`}>
+                                            {kot.status?.toUpperCase() || 'UNKNOWN'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div style={{
@@ -192,7 +208,10 @@ function KDSContent() {
                                     fontSize: '0.9rem'
                                 }}>
                                     <span>Wait: {minsWait} mins</span>
-                                    <span>Table: {kot.table_number || 'N/A'}</span>
+                                    <span>Table: {kot.order?.table_number || 'N/A'}</span>
+                                    {kot.order?.waiter_name && (
+                                        <span style={{ color: 'var(--primary)', fontWeight: 500 }}>🧑‍🍳 {kot.order.waiter_name}</span>
+                                    )}
                                 </div>
 
                                 <div style={{ marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto' }}>

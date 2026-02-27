@@ -143,3 +143,92 @@ def cancel_order(
         raise HTTPException(status_code=400, detail=result.get("error"))
     
     return result
+
+
+# ─── Waiter Endpoints ────────────────────────────────────────
+
+@router.get("/waiter/active")
+def get_waiter_active_orders(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get active orders placed by the logged-in waiter"""
+    from models.order import OrderSource, OrderStatus as OS
+    from sqlalchemy import and_
+    
+    orders = db.query(Order).filter(
+        and_(
+            Order.restaurant_id == str(current_user.restaurant_id),
+            Order.created_by == str(current_user.id),
+            Order.status.notin_([OS.COMPLETED, OS.CANCELLED]),
+        )
+    ).order_by(Order.created_at.desc()).all()
+    
+    results = []
+    for o in orders:
+        items = []
+        for oi in o.order_items:
+            mi = oi.menu_item
+            items.append({
+                "name": mi.name if mi else "Unknown",
+                "quantity": oi.quantity,
+                "unit_price": float(oi.unit_price),
+                "status": oi.item_status.value if oi.item_status else "placed",
+            })
+        results.append({
+            "id": o.id,
+            "order_number": o.order_number,
+            "table_number": o.table_number,
+            "status": o.status.value,
+            "items": items,
+            "total_amount": float(o.total_amount or 0),
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+        })
+    
+    return {"orders": results, "count": len(results)}
+
+
+# ─── Online Order Endpoints (Zomato/Swiggy Simulation) ───────
+
+@router.get("/online/pending")
+def get_pending_online_orders(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all pending Zomato/Swiggy orders awaiting approval"""
+    from services.online_order_service import OnlineOrderService
+    orders = OnlineOrderService.get_pending_orders(db, str(current_user.restaurant_id))
+    return {"orders": orders, "count": len(orders)}
+
+
+@router.post("/online/{order_id}/approve")
+def approve_online_order(
+    order_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Approve a pending online order — generates KOTs and deducts inventory"""
+    from services.online_order_service import OnlineOrderService
+    result = OnlineOrderService.approve_order(db, order_id, str(current_user.id))
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result
+
+
+@router.post("/online/{order_id}/reject")
+def reject_online_order(
+    order_id: str,
+    reason: str = "Restaurant is busy",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reject a pending online order"""
+    from services.online_order_service import OnlineOrderService
+    result = OnlineOrderService.reject_order(db, order_id, reason)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result

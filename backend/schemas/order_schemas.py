@@ -1,7 +1,7 @@
 from pydantic import BaseModel, UUID4
 from typing import Optional, List
 from datetime import datetime
-from models.order import OrderStatus, OrderType
+from models.order import OrderStatus, OrderType, OrderSource
 from schemas.menu_schemas import MenuItemResponse
 
 # Order Item Schema
@@ -25,10 +25,12 @@ class OrderItemResponse(OrderItemCreate):
 # Order Schemas
 class OrderCreate(BaseModel):
     order_type: OrderType = OrderType.DINE_IN
+    order_source: Optional[str] = None  # 'pos', 'waiter', 'zomato', 'swiggy'
     table_number: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     special_instructions: Optional[str] = None
+    waiter_name: Optional[str] = None
     items: List[OrderItemCreate]
     discount_amount: float = 0
     payment_mode: Optional[str] = None  # 'cash', 'upi', 'card'
@@ -39,9 +41,14 @@ class OrderResponse(BaseModel):
     restaurant_id: UUID4
     order_number: str
     order_type: OrderType
+    order_source: Optional[OrderSource] = OrderSource.POS
     status: OrderStatus
     table_number: Optional[str]
     customer_name: Optional[str]
+    customer_phone: Optional[str] = None
+    waiter_name: Optional[str] = None
+    delivery_address: Optional[str] = None
+    platform_order_id: Optional[str] = None
     subtotal: float
     gst_amount: float
     discount_amount: float

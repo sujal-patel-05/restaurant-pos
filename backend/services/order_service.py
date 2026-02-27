@@ -43,16 +43,26 @@ class OrderService:
             # Generate order number
             order_number = generate_order_number(str(restaurant_id))
             
+            # Determine order source
+            from models.order import OrderSource
+            source_str = order_data.get("order_source", "pos")
+            try:
+                order_source = OrderSource(source_str) if source_str else OrderSource.POS
+            except ValueError:
+                order_source = OrderSource.POS
+            
             # Create order
             order = Order(
                 restaurant_id=restaurant_id,
                 order_number=order_number,
                 order_type=order_data.get("order_type", "dine_in"),
+                order_source=order_source,
                 status=OrderStatus.PLACED,
                 table_number=order_data.get("table_number"),
                 customer_name=order_data.get("customer_name"),
                 customer_phone=order_data.get("customer_phone"),
                 special_instructions=order_data.get("special_instructions"),
+                waiter_name=order_data.get("waiter_name"),
                 created_by=user_id
             )
             db.add(order)

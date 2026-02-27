@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Dynamically determine the backend URL based on where the frontend is hosted
+// This prevents IPv4 vs IPv6 'localhost' resolution issues on Windows
+const getBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    // If we're running locally, use the exact same hostname but port 8000
+    if (typeof window !== 'undefined' && window.location.hostname) {
+        return `http://${window.location.hostname}:8000`;
+    }
+    return 'http://127.0.0.1:8000';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -76,6 +87,18 @@ export const ordersAPI = {
     cancelOrder: (id) => api.delete(`/api/orders/${id}`),
 };
 
+// Online Orders API (Zomato/Swiggy)
+export const onlineOrdersAPI = {
+    getPending: () => api.get('/api/orders/online/pending'),
+    approve: (orderId) => api.post(`/api/orders/online/${orderId}/approve`),
+    reject: (orderId, reason = 'Restaurant is busy') => api.post(`/api/orders/online/${orderId}/reject`, null, { params: { reason } }),
+};
+
+// Waiter API
+export const waiterAPI = {
+    getActiveOrders: () => api.get('/api/orders/waiter/active'),
+};
+
 // KDS API
 export const kdsAPI = {
     getActiveKOTs: () => api.get('/api/kds/'),
@@ -100,6 +123,10 @@ export const reportsAPI = {
     getIngredientUsage: (days = 7) => api.get('/api/reports/inventory/usage', { params: { days } }),
     getWastageReport: (days = 7) => api.get('/api/reports/wastage', { params: { days } }),
     getCostAnalysis: (menuItemId) => api.get(`/api/reports/cost-analysis/${menuItemId}`),
+    getOnlineVsOffline: (days = 30) => api.get('/api/reports/online-vs-offline', { params: { days } }),
+    getDashboardStats: () => api.get('/api/reports/dashboard-stats'),
+    getDashboardCharts: () => api.get('/api/reports/dashboard-charts'),
+    getSalesForecast: (days = 30, forecastDays = 7) => api.get('/api/reports/sales-forecast', { params: { days, forecast_days: forecastDays } }),
 };
 
 // AI Chatbot API

@@ -6,6 +6,7 @@ import enum
 from database import Base
 
 class OrderStatus(str, enum.Enum):
+    PENDING_ONLINE = "pending_online"  # Awaiting manager approval (Zomato/Swiggy)
     PLACED = "placed"
     PREPARING = "preparing"
     READY = "ready"
@@ -18,6 +19,13 @@ class OrderType(str, enum.Enum):
     TAKEAWAY = "takeaway"
     DELIVERY = "delivery"
 
+class OrderSource(str, enum.Enum):
+    POS = "pos"           # Direct POS / walk-in
+    ZOMATO = "zomato"     # Zomato online order
+    SWIGGY = "swiggy"     # Swiggy online order
+    WAITER = "waiter"     # Waiter tablet/mobile order
+    VOICE_TABLE = "voice_table"  # Customer voice order from table device
+
 class Order(Base):
     __tablename__ = "orders"
     
@@ -25,11 +33,18 @@ class Order(Base):
     restaurant_id = Column(String(36), ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
     order_number = Column(String(50), unique=True, nullable=False)
     order_type = Column(SQLEnum(OrderType), nullable=False, default=OrderType.DINE_IN)
+    order_source = Column(SQLEnum(OrderSource), nullable=False, default=OrderSource.POS)
     status = Column(SQLEnum(OrderStatus), nullable=False, default=OrderStatus.PLACED)
     table_number = Column(String(20))
+    delivery_address = Column(String(500))  # For online delivery orders
+    platform_order_id = Column(String(100))  # Zomato/Swiggy order reference
+    rejection_reason = Column(String(255))  # If rejected
     customer_name = Column(String(255))
     customer_phone = Column(String(20))
     special_instructions = Column(String)
+    waiter_name = Column(String(255))  # Name of waiter who took the order
+    session_id = Column(String(100), ForeignKey("table_sessions.id"), nullable=True)  # Voice table session
+    voice_log_id = Column(String(36), ForeignKey("voice_order_logs.id"), nullable=True)
     subtotal = Column(DECIMAL(10, 2), default=0)
     gst_amount = Column(DECIMAL(10, 2), default=0)
     discount_amount = Column(DECIMAL(10, 2), default=0)
@@ -45,6 +60,10 @@ class Order(Base):
     kot_items = relationship("KOT", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="order", cascade="all, delete-orphan")
+    
+    @property
+    def is_online(self):
+        return self.order_source in (OrderSource.ZOMATO, OrderSource.SWIGGY)
 
 class OrderItem(Base):
     __tablename__ = "order_items"

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { AIChatWidget } from './AIChatWidget';
+import OnlineOrderNotification from './OnlineOrderNotification';
 import {
     LayoutDashboard,
     ShoppingCart,
@@ -49,6 +50,8 @@ export function AppLayout({ children, title, subtitle, actions }) {
 
     return (
         <div className="app-container">
+            {/* Online Order Notifications (Zomato/Swiggy) */}
+            <OnlineOrderNotification />
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
                 <div className="sidebar-header">

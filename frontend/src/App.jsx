@@ -12,6 +12,9 @@ import BillingInterface from './pages/BillingInterface';
 import ReportsDashboard from './pages/ReportsDashboard';
 import AskAI from './pages/AskAI';
 import AgentInsights from './pages/AgentInsights';
+import WaiterLogin from './pages/WaiterLogin';
+import WaiterApp from './pages/WaiterApp';
+import TableVoiceOrder from './pages/TableVoiceOrder';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -21,8 +24,11 @@ function App() {
             <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/waiter/login" element={<WaiterLogin />} />
+                <Route path="/waiter" element={<WaiterApp />} />
+                <Route path="/table/:tableId" element={<TableVoiceOrder />} />
 
-                {/* Protected Routes */}
+                {/* Protected Routes (Admin/Staff) */}
                 <Route element={<ProtectedRoute />}>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/pos" element={<POSTerminal />} />
