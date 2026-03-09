@@ -112,6 +112,7 @@ export const billingAPI = {
         api.post(`/api/billing/calculate/${orderId}`, null, { params: { discount_code: discountCode } }),
     processPayment: (data) => api.post('/api/billing/payment', data),
     generateInvoice: (orderId, type = "thermal") => api.post(`/api/billing/invoice/${orderId}`, null, { params: { type } }),
+    downloadInvoice: (orderId, type = "a4") => api.get(`/api/billing/invoice/${orderId}/download`, { params: { type }, responseType: 'blob' }),
     emailInvoice: (orderId, email) => api.post(`/api/billing/email/${orderId}`, null, { params: { email } }),
 };
 

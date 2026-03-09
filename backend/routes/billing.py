@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
@@ -6,6 +7,7 @@ from schemas.billing_schemas import PaymentCreate, PaymentResponse, InvoiceRespo
 from services.billing_service import BillingService
 from routes.auth import get_current_user
 from uuid import UUID
+import os
 
 router = APIRouter(prefix="/api/billing", tags=["Billing & Payments"])
 
@@ -62,6 +64,37 @@ def generate_invoice(
     
     return result
 
+@router.get("/invoice/{order_id}/download")
+def download_invoice(
+    order_id: UUID,
+    type: str = "a4",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate and download invoice PDF directly.
+    type: 'thermal' or 'a4'
+    """
+    result = BillingService.generate_invoice(db, order_id, type)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    # Build the file path from the returned URL
+    pdf_url = result.get("pdf_url", "")
+    filepath = os.path.join("static", pdf_url.lstrip("/"))
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Invoice PDF not found")
+    
+    filename = os.path.basename(filepath)
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @router.post("/email/{order_id}", response_model=dict)
 def email_invoice(
     order_id: UUID,
@@ -76,3 +109,4 @@ def email_invoice(
         raise HTTPException(status_code=400, detail=result.get("error"))
     
     return result
+

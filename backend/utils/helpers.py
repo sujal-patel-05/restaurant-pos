@@ -9,7 +9,12 @@ def generate_order_number(restaurant_id: str) -> str:
 
 def generate_kot_number(order_number: str, item_index: int) -> str:
     """Generate KOT number from order number"""
-    return f"KOT-{order_number.split('-')[1]}-{item_index}"
+    parts = order_number.split('-')
+    if len(parts) >= 3:
+        order_ref = f"{parts[1]}{parts[2]}"
+    else:
+        order_ref = datetime.now().strftime("%H%M%S%f")[-12:]
+    return f"KOT-{order_ref}-{item_index}"
 
 def generate_invoice_number(restaurant_id: str) -> str:
     """Generate unique invoice number"""

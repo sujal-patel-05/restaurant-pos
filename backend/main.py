@@ -32,9 +32,11 @@ app.add_middleware(
 # Create public directory if it doesn't exist
 os.makedirs("public/images/menu_items", exist_ok=True)
 os.makedirs("temp_audio", exist_ok=True)
+os.makedirs("static/invoices", exist_ok=True)
 
 # Mount static files
 app.mount("/public", StaticFiles(directory="public"), name="public")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Include routers
 app.include_router(auth.router)

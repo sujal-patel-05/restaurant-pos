@@ -1,6 +1,6 @@
 """
-WhisperEngine — Speech-to-text using Groq's free Whisper API.
-Uses whisper-large-v3 via Groq Cloud.
+STT Engine — Multi-provider Speech-to-Text for Voice-to-KOT.
+Priority: Sarvam AI (Saaras v3) → Groq Whisper → Local Whisper.
 Converts webm/opus audio to WAV via ffmpeg before sending.
 """
 import os
@@ -86,44 +86,63 @@ class WhisperEngine:
         return cls._instance
 
     def __init__(self):
+        self._sarvam_key = os.getenv("SARVAM_API_KEY", "")
         self._groq_key = os.getenv("GROQ_API_KEY", "")
         self._local_model = None
 
     def load_model(self):
+        if self._sarvam_key:
+            print("[STT] ✅ Sarvam AI (Saaras v3) — primary STT engine")
         if self._groq_key:
-            print("[WHISPER] Using Groq Whisper API (whisper-large-v3) - fastest & most accurate")
-        else:
-            print("[WHISPER] No GROQ_API_KEY, loading local base model...")
+            print("[STT] ✅ Groq Whisper (whisper-large-v3) — fallback STT")
+        if not self._sarvam_key and not self._groq_key:
+            print("[STT] No cloud STT keys found, loading local Whisper model...")
             try:
                 import whisper
                 self._local_model = whisper.load_model("base")
-                print("[WHISPER] Local base model loaded")
+                print("[STT] Local base model loaded")
             except Exception as e:
-                print(f"[WHISPER] Failed: {e}")
+                print(f"[STT] Failed to load local model: {e}")
 
     @property
     def is_loaded(self):
-        return bool(self._groq_key) or self._local_model is not None
+        return bool(self._sarvam_key) or bool(self._groq_key) or self._local_model is not None
 
     def transcribe(self, audio_path: str, menu_items: list[str] = None) -> dict:
-        """Transcribe audio. Converts to WAV first for reliability."""
-        print(f"[WHISPER] transcribe() called with: {audio_path}")
+        """Transcribe audio. Tries Sarvam AI first, then Groq, then local."""
+        print(f"[STT] transcribe() called with: {audio_path}")
         
         # ALWAYS convert to WAV regardless of format
         wav_path = convert_to_wav(audio_path)
         use_wav = wav_path != audio_path
 
         try:
-            if self._groq_key:
-                result = self._transcribe_groq(wav_path, menu_items)
-            elif self._local_model:
+            result = None
+            
+            # Priority 1: Sarvam AI (fastest, best for Indian languages)
+            if self._sarvam_key:
+                try:
+                    result = self._transcribe_sarvam(wav_path, menu_items)
+                except Exception as e:
+                    print(f"[STT] Sarvam AI failed: {e}, trying fallback...")
+            
+            # Priority 2: Groq Whisper
+            if result is None and self._groq_key:
+                try:
+                    result = self._transcribe_groq(wav_path, menu_items)
+                except Exception as e:
+                    print(f"[STT] Groq Whisper failed: {e}, trying fallback...")
+            
+            # Priority 3: Local Whisper
+            if result is None and self._local_model:
                 result = self._transcribe_local(wav_path, menu_items)
-            else:
+            
+            if result is None:
                 raise RuntimeError("No speech-to-text engine available")
 
             # Check for hallucinations
             if is_hallucination(result["text"]):
-                print(f"[WHISPER] HALLUCINATION detected: '{result['text']}'")
+                print(f"[STT] HALLUCINATION detected: '{result['text']}'")
                 result["text"] = ""
                 result["hallucination"] = True
 
@@ -134,6 +153,50 @@ class WhisperEngine:
                     os.remove(wav_path)
                 except OSError:
                     pass
+
+    def _transcribe_sarvam(self, audio_path: str, menu_items: list[str] = None) -> dict:
+        """Transcribe using Sarvam AI's Saaras v3 model.
+        Uses 'translate' mode to convert any Indian language to English.
+        Typically responds in < 1 second for audio < 30s.
+        """
+        import httpx
+
+        start = time.time()
+        file_size = os.path.getsize(audio_path) if os.path.exists(audio_path) else 0
+        print(f"[STT-SARVAM] Sending file: {audio_path} ({file_size} bytes)")
+
+        try:
+            with open(audio_path, "rb") as audio_file:
+                response = httpx.post(
+                    "https://api.sarvam.ai/speech-to-text",
+                    headers={"api-subscription-key": self._sarvam_key},
+                    data={
+                        "model": "saaras:v3",
+                        "language_code": "unknown",  # auto-detect language
+                        "mode": "translate",          # any Indian language → English
+                    },
+                    files={
+                        "file": ("audio.wav", audio_file, "audio/wav"),
+                    },
+                    timeout=15.0,
+                )
+
+            elapsed_ms = int((time.time() - start) * 1000)
+
+            if response.status_code == 200:
+                data = response.json()
+                transcript = data.get("transcript", "").strip()
+                language = data.get("language_code", "unknown")
+                print(f"[STT-SARVAM] ✅ Transcribed in {elapsed_ms}ms: '{transcript}' (lang={language})")
+                return {"text": transcript, "language": language, "duration_ms": elapsed_ms, "provider": "sarvam"}
+            else:
+                error = response.text[:300]
+                print(f"[STT-SARVAM] ❌ API error {response.status_code}: {error}")
+                raise RuntimeError(f"Sarvam API error: {response.status_code}")
+
+        except httpx.TimeoutException:
+            print("[STT-SARVAM] ⏰ Timeout!")
+            raise RuntimeError("Sarvam API timed out")
 
     def _transcribe_groq(self, audio_path: str, menu_items: list[str] = None) -> dict:
         """Transcribe using Groq's free Whisper API."""

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     AI_PROVIDER: str = "groq"  # 'groq' or 'ollama'
     
+    # Sarvam AI (Speech-to-Text)
+    SARVAM_API_KEY: Optional[str] = None
+    
     # Email / SMTP
     OWNER_EMAIL: Optional[str] = None
     SMTP_SERVER: str = "smtp.gmail.com"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
+import { InstallAppButton } from './InstallAppButton';
 import { AIChatWidget } from './AIChatWidget';
 import OnlineOrderNotification from './OnlineOrderNotification';
 import {
@@ -79,21 +80,13 @@ export function AppLayout({ children, title, subtitle, actions }) {
 
                 <div className="sidebar-footer">
                     <button
-                        className="nav-item"
+                        className="sidebar-logout-btn"
                         onClick={() => {
                             localStorage.removeItem('token');
                             localStorage.removeItem('user');
                             window.location.href = '/login';
                         }}
                         title="Logout"
-                        style={{
-                            width: '100%',
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            color: 'var(--text-secondary)',
-                            transition: 'all 0.2s ease'
-                        }}
                     >
                         <span className="nav-item-icon"><LogOut size={20} /></span>
                         <span>Logout</span>
@@ -117,6 +110,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
                         {subtitle && <p className="page-subtitle">{subtitle}</p>}
                     </div>
                     <div className="flex items-center gap-md">
+                        <InstallAppButton />
                         <ThemeToggle />
                         {actions}
                     </div>

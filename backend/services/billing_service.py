@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Order, Payment, Invoice, Discount, PaymentMode
+from models import Order, OrderItem, MenuItem, Payment, Invoice, Discount, PaymentMode
 from utils.helpers import generate_invoice_number
 from typing import Dict
 from uuid import UUID
@@ -125,24 +125,30 @@ class BillingService:
         invoice_type: 'thermal' or 'a4'
         """
         from services.pdf_service import PDFService
+        from sqlalchemy.orm import joinedload
         import os
 
         try:
-            order = db.query(Order).filter(Order.id == order_id).first()
+            oid = str(order_id)
+            order = db.query(Order).options(
+                joinedload(Order.restaurant),
+                joinedload(Order.order_items).joinedload(OrderItem.menu_item),
+                joinedload(Order.payments)
+            ).filter(Order.id == oid).first()
             
             if not order:
                 return {"success": False, "error": "Order not found"}
             
             # Use existing invoice number if available, else generate new
             existing_invoice = db.query(Invoice).filter(
-                Invoice.order_id == order_id
+                Invoice.order_id == oid
             ).first()
             
             invoice_number = existing_invoice.invoice_number if existing_invoice else generate_invoice_number(str(order.restaurant_id))
             
             if not existing_invoice:
                 invoice = Invoice(
-                    order_id=order_id,
+                    order_id=oid,
                     invoice_number=invoice_number,
                     pdf_url="" # Will update after generation
                 )
@@ -160,9 +166,19 @@ class BillingService:
             filepath = os.path.join(output_dir, filename)
             
             if invoice_type == "a4":
-                PDFService.generate_a4_invoice(order, filepath)
+                PDFService.generate_a4_invoice(
+                    order,
+                    filepath,
+                    restaurant=order.restaurant,
+                    invoice_number=invoice_number
+                )
             else:
-                PDFService.generate_thermal_receipt(order, filepath)
+                PDFService.generate_thermal_receipt(
+                    order,
+                    filepath,
+                    restaurant=order.restaurant,
+                    invoice_number=invoice_number
+                )
             
             # Update PDF URL
             invoice.pdf_url = f"/invoices/{filename}"

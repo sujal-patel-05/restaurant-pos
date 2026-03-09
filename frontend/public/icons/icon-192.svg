@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="SujalPOS Icon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="#0F172A"/>
+  <rect x="34" y="34" width="124" height="124" rx="28" fill="url(#g)"/>
+  <path d="M69 72l18 18m0 0l18 18m-18-18l18-18m-18 18l-18 18" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M114 72l18 18m0 0l-18 18" stroke="#fff" stroke-width="10" stroke-linecap="round" fill="none"/>
+</svg>

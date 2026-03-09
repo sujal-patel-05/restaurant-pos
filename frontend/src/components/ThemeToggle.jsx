@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Moon, Sun } from 'lucide-react';
 
 /**
  * Theme Toggle Component for Dark/Light Mode
@@ -33,20 +34,19 @@ export function ThemeToggle() {
             onClick={toggleTheme}
             className="btn btn-secondary"
             style={{
-                padding: '0.75rem',
+                padding: '0.6rem',
                 minWidth: 'auto',
                 position: 'relative',
-                overflow: 'hidden',
+                overflow: 'hidden'
             }}
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
             <span style={{
-                fontSize: '1.25rem',
                 display: 'inline-block',
                 transition: 'transform 0.3s ease',
                 transform: isDark ? 'rotate(180deg)' : 'rotate(0deg)',
             }}>
-                {isDark ? '🌙' : '☀️'}
+                {isDark ? <Moon size={18} strokeWidth={2} /> : <Sun size={18} strokeWidth={2} />}
             </span>
         </button>
     );

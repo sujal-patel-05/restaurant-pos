@@ -57,16 +57,10 @@ class VoiceOrderService:
 
     @staticmethod
     def parse_with_groq(transcript: str, menu_data: list[dict]) -> list[dict]:
-        """Step 2: Parse transcript into structured items using Groq LLM."""
+        """Step 2: Parse transcript into structured items using Sarvam AI LLM (primary) or Groq (fallback)."""
+        import httpx
+        import os
         from config import settings
-
-        try:
-            from groq import Groq
-        except ImportError:
-            logger.error("groq package not installed")
-            raise
-
-        client = Groq(api_key=settings.GROQ_API_KEY)
 
         # Build menu context string
         menu_str = "\n".join(
@@ -90,30 +84,77 @@ Rules:
 
 Respond with ONLY the JSON array:"""
 
-        response = client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=1000,
-        )
+        # Try Sarvam AI Chat Completion first
+        sarvam_key = os.getenv("SARVAM_API_KEY", "")
+        if sarvam_key:
+            try:
+                logger.info("[VOICE] Parsing with Sarvam AI LLM...")
+                print("[VOICE] Parsing with Sarvam AI LLM...")
+                response = httpx.post(
+                    "https://api.sarvam.ai/v1/chat/completions",
+                    headers={
+                        "api-subscription-key": sarvam_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "sarvam-m",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1,
+                        "max_tokens": 1000,
+                    },
+                    timeout=15.0,
+                )
 
-        raw_response = response.choices[0].message.content.strip()
+                if response.status_code == 200:
+                    data = response.json()
+                    raw_response = data["choices"][0]["message"]["content"].strip()
+                    print(f"[VOICE-SARVAM] Raw LLM response: {raw_response}")
 
-        # Strip markdown code block markers if present
-        if raw_response.startswith("```"):
-            lines = raw_response.split("\n")
-            # Remove first and last lines (```json and ```)
-            lines = [l for l in lines if not l.strip().startswith("```")]
-            raw_response = "\n".join(lines)
+                    # Strip markdown code block markers if present
+                    if raw_response.startswith("```"):
+                        lines = raw_response.split("\n")
+                        lines = [l for l in lines if not l.strip().startswith("```")]
+                        raw_response = "\n".join(lines)
 
+                    parsed = json.loads(raw_response)
+                    if not isinstance(parsed, list):
+                        parsed = [parsed]
+                    print(f"[VOICE-SARVAM] ✅ Parsed {len(parsed)} items")
+                    return parsed
+                else:
+                    print(f"[VOICE-SARVAM] ❌ API error {response.status_code}: {response.text[:200]}")
+            except Exception as e:
+                print(f"[VOICE-SARVAM] ❌ Parse failed: {e}, trying Groq fallback...")
+
+        # Fallback: Groq LLM
         try:
-            parsed = json.loads(raw_response)
-            if not isinstance(parsed, list):
-                parsed = [parsed]
-            return parsed
-        except json.JSONDecodeError as e:
-            logger.error(f"[VOICE] Failed to parse Groq response: {e}\nRaw: {raw_response}")
-            return []
+            from groq import Groq
+            groq_key = getattr(settings, 'GROQ_API_KEY', None)
+            if groq_key:
+                logger.info("[VOICE] Falling back to Groq LLM parsing...")
+                print("[VOICE] Falling back to Groq LLM parsing...")
+                client = Groq(api_key=groq_key)
+                response = client.chat.completions.create(
+                    model=settings.GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=1000,
+                )
+                raw_response = response.choices[0].message.content.strip()
+
+                if raw_response.startswith("```"):
+                    lines = raw_response.split("\n")
+                    lines = [l for l in lines if not l.strip().startswith("```")]
+                    raw_response = "\n".join(lines)
+
+                parsed = json.loads(raw_response)
+                if not isinstance(parsed, list):
+                    parsed = [parsed]
+                return parsed
+        except Exception as e:
+            logger.error(f"[VOICE] Groq fallback also failed: {e}")
+
+        return []
 
     @staticmethod
     def fuzzy_match_items(parsed_items: list[dict], menu_data: list[dict]) -> list[dict]:

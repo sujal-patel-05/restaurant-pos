@@ -17,7 +17,9 @@ import {
     BarChart3,
     TrendingUp,
     Brain,
-    Activity
+    Activity,
+    RefreshCw,
+    Plus
 } from 'lucide-react';
 
 function Dashboard() {
@@ -207,11 +209,11 @@ function Dashboard() {
 
     const actions = (
         <>
-            <button className="btn btn-secondary" onClick={fetchDashboardData}>
-                <span>🔄</span>
+            <button className="btn btn-secondary" onClick={fetchDashboardData} title="Refresh Dashboard">
+                <RefreshCw size={16} />
             </button>
             <Link to="/pos" className="btn btn-primary">
-                <span>➕</span> New Order
+                <Plus size={16} /> New Order
             </Link>
         </>
     );

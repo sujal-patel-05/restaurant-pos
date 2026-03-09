@@ -1,4 +1,4 @@
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, UUID4, Field
 from typing import Optional, List
 from datetime import datetime
 from models.order import OrderStatus, OrderType, OrderSource
@@ -77,3 +77,47 @@ class KOTResponse(BaseModel):
 
 class KOTUpdateStatus(BaseModel):
     status: OrderStatus
+
+
+class KOTItemInfo(BaseModel):
+    id: Optional[UUID4] = None
+    menu_item_id: Optional[UUID4] = None
+    name: str
+    quantity: int
+    notes: Optional[str] = None
+    unit_price: Optional[float] = None
+    item_status: Optional[OrderStatus] = None
+
+
+class KOTOrderContext(BaseModel):
+    id: Optional[UUID4] = None
+    order_number: Optional[str] = None
+    order_type: Optional[str] = None
+    order_source: Optional[str] = None
+    table_number: Optional[str] = None
+    waiter_name: Optional[str] = None
+    customer_name: Optional[str] = None
+    special_instructions: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class KOTTicketResponse(BaseModel):
+    id: UUID4
+    order_id: UUID4
+    kot_number: str
+    status: OrderStatus
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    created_at: datetime
+    order_number: Optional[str] = None
+    order_type: Optional[str] = None
+    order_source: Optional[str] = None
+    table_number: Optional[str] = None
+    waiter_name: Optional[str] = None
+    customer_name: Optional[str] = None
+    special_instructions: Optional[str] = None
+    items: List[KOTItemInfo] = Field(default_factory=list)
+    order: Optional[KOTOrderContext] = None
+
+    class Config:
+        from_attributes = True

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { menuAPI, ordersAPI } from '../services/api';
+import { menuAPI, ordersAPI, billingAPI } from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { Utensils } from 'lucide-react';
@@ -63,6 +63,7 @@ function POSTerminal() {
     };
 
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const backendBaseUrl = `http://${window.location.hostname}:8000`;
 
     const placeOrder = async () => {
         if (cart.length === 0) {
@@ -84,6 +85,11 @@ function POSTerminal() {
         }
 
         try {
+            const billTab = window.open('', '_blank');
+            if (billTab && billTab.document) {
+                billTab.document.write('<title>Generating Bill...</title><p style="font-family: Arial, sans-serif; padding: 16px;">Generating bill, please wait...</p>');
+            }
+
             const orderData = {
                 order_type: orderType.replace('-', '_'), // 'dine-in' -> 'dine_in'
                 table_number: orderType === 'dine-in' ? tableNumber : null,
@@ -94,10 +100,39 @@ function POSTerminal() {
                 }))
             };
 
-            await ordersAPI.createOrder(orderData);
-            alert('Order placed successfully!');
+            const response = await ordersAPI.createOrder(orderData);
+            const orderResult = response.data;
+
+            // Clear the cart immediately
             setCart([]);
             setTableNumber('');
+
+            // Auto-generate invoice and open in new tab
+            if (orderResult.order_id) {
+                try {
+                    const invoiceRes = await billingAPI.generateInvoice(orderResult.order_id, 'thermal');
+                    if (invoiceRes.data?.success && invoiceRes.data?.pdf_url) {
+                        const invoiceUrl = `${backendBaseUrl}/static${invoiceRes.data.pdf_url}`;
+                        if (billTab && !billTab.closed) {
+                            billTab.location.href = invoiceUrl;
+                        } else {
+                            window.open(invoiceUrl, '_blank');
+                        }
+                    } else if (billTab && !billTab.closed) {
+                        billTab.close();
+                    }
+                } catch (invoiceErr) {
+                    console.warn('Invoice auto-generation failed:', invoiceErr);
+                    if (billTab && !billTab.closed) {
+                        billTab.close();
+                    }
+                    // Don't block the user — order was placed successfully
+                }
+            } else if (billTab && !billTab.closed) {
+                billTab.close();
+            }
+
+            alert(`✅ Order #${orderResult.order_number} placed successfully! Invoice opened in new tab.`);
         } catch (error) {
             console.error('Error placing order:', error);
             const errorDetail = error.response?.data?.detail;
@@ -122,6 +157,14 @@ function POSTerminal() {
 
     const actions = (
         <>
+            <button
+                className="btn btn-secondary"
+                onClick={() => window.open('/waiter/login', '_blank')}
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                title="Open Waiter Login"
+            >
+                Waiter Login
+            </button>
             <button className="btn btn-secondary" onClick={fetchMenuData}>
                 <span>🔄</span>
             </button>
@@ -148,7 +191,7 @@ function POSTerminal() {
                     <LoadingSpinner size="lg" />
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '2rem', alignItems: 'start' }}>
+                <div className="pos-layout">
                     {/* Menu Items */}
                     <div>
                         {/* Order Type & Filters */}
@@ -192,7 +235,7 @@ function POSTerminal() {
 
                             {/* Table Number Input */}
                             {orderType === 'dine-in' && (
-                                <div className="fade-in-up" style={{ marginTop: '1.5rem', maxWidth: '300px' }}>
+                                <div className="fade-in-up" style={{ marginTop: '1rem', maxWidth: '260px' }}>
                                     <label className="form-label">
                                         Table Number <span style={{ color: 'var(--error)' }}>*</span>
                                     </label>
@@ -215,7 +258,7 @@ function POSTerminal() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="modules-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+                            <div className="modules-grid pos-menu-grid">
                                 {filteredItems.map(item => (
                                     <div
                                         key={item.id}
@@ -232,7 +275,7 @@ function POSTerminal() {
                                     >
                                         {/* Product Image */}
                                         <div style={{
-                                            height: '150px',
+                                            height: '138px',
                                             width: '100%',
                                             background: item.image_url ? 'transparent' : 'var(--bg-body)',
                                             display: 'flex',
@@ -244,7 +287,7 @@ function POSTerminal() {
                                         }}>
                                             {item.image_url ? (
                                                 <img
-                                                    src={`http://localhost:8000${item.image_url}`}
+                                                    src={`${backendBaseUrl}${item.image_url}`}
                                                     alt={item.name}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />
@@ -253,7 +296,7 @@ function POSTerminal() {
                                             )}
                                         </div>
 
-                                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
                                                 <div className="badge" style={{
                                                     fontSize: '0.7rem',
@@ -271,12 +314,12 @@ function POSTerminal() {
                                                 )}
                                             </div>
 
-                                            <h3 className="module-card-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{item.name}</h3>
+                                            <h3 className="module-card-title" style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>{item.name}</h3>
                                             <p className="module-card-description" style={{ marginBottom: '1rem', flex: 1 }}>
                                                 {item.description || 'No description'}
                                             </p>
 
-                                            <div style={{ marginTop: 'auto', fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                            <div style={{ marginTop: 'auto', fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)' }}>
                                                 ₹{parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                             </div>
                                         </div>
@@ -287,20 +330,13 @@ function POSTerminal() {
                     </div>
 
                     {/* Sticky Cart */}
-                    <div className="stat-card" style={{
-                        position: 'sticky',
-                        top: '1rem',
-                        height: 'calc(100vh - 140px)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        padding: '0'
-                    }}>
-                        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Current Order</h2>
+                    <div className="stat-card pos-cart" style={{ padding: '0' }}>
+                        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+                            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Current Order</h2>
                         </div>
 
                         {/* Cart Items List */}
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem' }}>
                             {cart.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '2rem 0', opacity: 0.5 }}>
                                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛒</div>
@@ -345,7 +381,7 @@ function POSTerminal() {
                         </div>
 
                         {/* Cart Footer */}
-                        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-body)' }}>
+                        <div style={{ padding: '1.25rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-body)' }}>
 
                             {/* Payment Method Selection */}
                             <div style={{ marginBottom: '1rem' }}>
@@ -361,7 +397,7 @@ function POSTerminal() {
                                             style={{
                                                 flex: 1,
                                                 textTransform: 'capitalize',
-                                                fontSize: '0.9rem',
+                                                fontSize: '0.85rem',
                                                 padding: '0.5rem',
                                                 borderColor: paymentMode === mode ? 'var(--primary)' : 'var(--border-color)'
                                             }}
