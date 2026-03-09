@@ -15,6 +15,8 @@ import AgentInsights from './pages/AgentInsights';
 import WaiterLogin from './pages/WaiterLogin';
 import WaiterApp from './pages/WaiterApp';
 import TableVoiceOrder from './pages/TableVoiceOrder';
+import CallOrders from './pages/CallOrders';
+import VoiceBotCall from './pages/VoiceBotCall';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -27,6 +29,7 @@ function App() {
                 <Route path="/waiter/login" element={<WaiterLogin />} />
                 <Route path="/waiter" element={<WaiterApp />} />
                 <Route path="/table/:tableId" element={<TableVoiceOrder />} />
+                <Route path="/order-call/:tableId" element={<VoiceBotCall />} />
 
                 {/* Protected Routes (Admin/Staff) */}
                 <Route element={<ProtectedRoute />}>
@@ -39,6 +42,7 @@ function App() {
                     <Route path="/reports" element={<ReportsDashboard />} />
                     <Route path="/ask-ai" element={<AskAI />} />
                     <Route path="/agents" element={<AgentInsights />} />
+                    <Route path="/call-orders" element={<CallOrders />} />
                 </Route>
 
                 {/* Catch all - redirect to dashboard (which will redirect to login if needed) */}

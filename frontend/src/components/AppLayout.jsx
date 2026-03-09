@@ -17,7 +17,8 @@ import {
     ChevronLeft,
     ChevronRight,
     ChefHat,
-    Brain
+    Brain,
+    Phone
 } from 'lucide-react';
 
 // Reusable Layout Component
@@ -47,6 +48,7 @@ export function AppLayout({ children, title, subtitle, actions }) {
         { path: '/reports', icon: <BarChart3 size={20} />, label: 'Reports' },
         { path: '/ask-ai', icon: <Sparkles size={20} />, label: 'Ask AI' },
         { path: '/agents', icon: <Brain size={20} />, label: 'AI Insights' },
+        { path: '/call-orders', icon: <Phone size={20} />, label: 'Call Orders' },
     ];
 
     return (
