@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # Sarvam AI (Speech-to-Text)
     SARVAM_API_KEY: Optional[str] = None
     
+    # Twilio (Phone Call Bot)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
+    
     # Email / SMTP
     OWNER_EMAIL: Optional[str] = None
     SMTP_SERVER: str = "smtp.gmail.com"
