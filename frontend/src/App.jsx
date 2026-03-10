@@ -12,10 +12,10 @@ import BillingInterface from './pages/BillingInterface';
 import ReportsDashboard from './pages/ReportsDashboard';
 import AskAI from './pages/AskAI';
 import AgentInsights from './pages/AgentInsights';
+import ProfileSettings from './pages/ProfileSettings';
 import WaiterLogin from './pages/WaiterLogin';
 import WaiterApp from './pages/WaiterApp';
 import TableVoiceOrder from './pages/TableVoiceOrder';
-import CallOrders from './pages/CallOrders';
 import VoiceBotCall from './pages/VoiceBotCall';
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -42,7 +42,7 @@ function App() {
                     <Route path="/reports" element={<ReportsDashboard />} />
                     <Route path="/ask-ai" element={<AskAI />} />
                     <Route path="/agents" element={<AgentInsights />} />
-                    <Route path="/call-orders" element={<CallOrders />} />
+                    <Route path="/profile" element={<ProfileSettings />} />
                 </Route>
 
                 {/* Catch all - redirect to dashboard (which will redirect to login if needed) */}

@@ -219,6 +219,7 @@ def generate():
 
             # Customer
             cust_name = f"{random.choice(CUSTOMER_FIRST)} {random.choice(CUSTOMER_LAST)}"
+            special_instructions = random.choice(SPECIAL_INSTRUCTIONS_ONLINE) if random.random() < 0.3 else f"[Eva Voice Order] Table {table_id}"
             cust_phone = random_phone() if random.random() < 0.6 else None
             table_num = random.choice(TABLE_NUMBERS) if order_type == OrderType.DINE_IN else None
 

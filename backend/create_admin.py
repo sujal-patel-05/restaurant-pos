@@ -9,7 +9,7 @@ def create_admin():
         restaurant = db.query(Restaurant).first()
         if not restaurant:
             print("No restaurant found. Creating one...")
-            restaurant = Restaurant(name="Demo Restaurant", address="123 Food St")
+            restaurant = Restaurant(name="Gajanand Fast Food", address="123 Food St")
             db.add(restaurant)
             db.commit()
             db.refresh(restaurant)

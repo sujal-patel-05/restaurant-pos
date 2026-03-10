@@ -1,0 +1,12 @@
+{
+  "/api/reports/sales?days=7": "OK",
+  "/api/reports/sales/items?days=7": "OK",
+  "/api/reports/peak-hours?days=7": "OK",
+  "/api/reports/inventory/usage?days=7": "OK",
+  "/api/reports/wastage?days=7": "OK",
+  "/api/reports/online-vs-offline?days=30": "OK",
+  "/api/reports/sales-forecast?days=30&forecast_days=7": "OK",
+  "/api/reports/daily-revenue-trend?days=30": "OK",
+  "/api/reports/category-sales?days=7": "OK",
+  "/api/reports/payment-methods?days=7": "OK"
+}

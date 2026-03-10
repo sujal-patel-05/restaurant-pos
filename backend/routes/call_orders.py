@@ -47,9 +47,9 @@ async def call_audio_stream(ws: WebSocket, restaurant_id: str = Query(...)):
     
     Client sends binary audio chunks (WebM/Opus from MediaRecorder).
     Server responds with JSON transcription results:
-      { "type": "transcript", "text": "...", "cumulative": "..." }
-      { "type": "status", "message": "..." }
-      { "type": "error", "message": "..." }
+      { "type": "bot_audio",  "audio": "<base64 WAV>", "text": "..." }
+      { "type": "transcript", "text": "customer said..." }
+      { "type": "order",      "items": [...], "total": 123 }
     """
     await ws.accept()
     

@@ -106,6 +106,7 @@ class OnlineOrderService:
             delivery_address = random.choice(DELIVERY_ADDRESSES)
             special_instructions = random.choice(SPECIAL_INSTRUCTIONS_ONLINE)
 
+            # Process Eva voice orders...
             # Create order
             order_number = generate_order_number(restaurant_id)
             order = Order(

@@ -95,6 +95,106 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
 }
 
+/* Settings Dropdown - Premium Styles */
+.settings-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 260px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 9999 !important;
+  padding: 8px;
+  animation: slideDownFade 0.2s ease-out;
+}
+
+[data-theme='dark'] .settings-dropdown {
+  background: var(--bg-surface, #1e293b);
+  border-color: var(--border-color, #334155);
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text-main, #1e293b);
+  font-weight: 500;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-body, #f8fafc);
+  color: var(--primary, #6366f1);
+}
+
+.dropdown-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--text-secondary, #64748b);
+}
+
+.dropdown-item:hover .dropdown-icon-wrapper {
+  color: var(--primary, #6366f1);
+}
+
+.dropdown-item.logout {
+  color: #ef4444;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-color, #e2e8f0);
+  margin: 6px 4px;
+}
+
+.dropdown-section {
+  padding: 8px 12px;
+}
+
+.top-bar-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.top-bar-icon-btn:hover,
+.top-bar-icon-btn.active {
+  background: var(--bg-body);
+  color: var(--primary);
+}
+
 /* === BASE STYLES === */
 * {
   box-sizing: border-box;

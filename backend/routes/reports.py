@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User
+from models import User, Order
 from services.report_service import ReportService
 from routes.auth import get_current_user
 from datetime import datetime, timedelta
@@ -144,6 +144,124 @@ def get_sales_forecast(
         history_days=days,
         forecast_days=forecast_days
     )
+
+@router.get("/daily-revenue-trend")
+def get_daily_revenue_trend(
+    days: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get daily revenue and order count trend for the last N days"""
+    from collections import defaultdict
+    from models import OrderStatus
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    rid = str(current_user.restaurant_id)
+
+    orders = db.query(Order).filter(
+        Order.restaurant_id == rid,
+        Order.status != "cancelled",
+        Order.created_at >= start_date,
+    ).all()
+
+    daily = defaultdict(lambda: {"revenue": 0.0, "orders": 0})
+    for o in orders:
+        d = o.created_at.strftime("%Y-%m-%d") if o.created_at else "unknown"
+        daily[d]["revenue"] += float(o.total_amount or 0)
+        daily[d]["orders"] += 1
+
+    trend = sorted([
+        {"date": k, "revenue": round(v["revenue"], 2), "orders": v["orders"]}
+        for k, v in daily.items()
+    ], key=lambda x: x["date"])
+
+    return {"trend": trend, "days": days}
+
+
+@router.get("/category-sales")
+def get_category_sales(
+    days: int = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get sales breakdown by menu category"""
+    from sqlalchemy import func
+    from models import OrderItem, MenuItem, Order, MenuCategory
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+
+    results = db.query(
+        MenuCategory.name.label("category"),
+        func.sum(OrderItem.quantity).label("quantity"),
+        func.sum(OrderItem.quantity * OrderItem.unit_price).label("revenue")
+    ).select_from(OrderItem).join(
+        MenuItem, OrderItem.menu_item_id == MenuItem.id
+    ).outerjoin(
+        MenuCategory, MenuItem.category_id == MenuCategory.id
+    ).join(
+        Order, Order.id == OrderItem.order_id
+    ).filter(
+        MenuItem.restaurant_id == str(current_user.restaurant_id),
+        Order.status != "cancelled",
+        Order.created_at >= start_date,
+        Order.created_at <= end_date
+    ).group_by(
+        MenuCategory.name
+    ).order_by(
+        func.sum(OrderItem.quantity * OrderItem.unit_price).desc()
+    ).all()
+
+    return {
+        "categories": [
+            {
+                "category": r.category or "Uncategorized",
+                "quantity": int(r.quantity or 0),
+                "revenue": round(float(r.revenue or 0), 2)
+            }
+            for r in results
+        ]
+    }
+
+
+@router.get("/payment-methods")
+def get_payment_methods(
+    days: int = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get payment method distribution"""
+    from sqlalchemy import func
+    from models import Payment, Order
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+
+    results = db.query(
+        Payment.payment_mode,
+        func.count(Payment.id).label("count"),
+        func.sum(Payment.amount).label("total")
+    ).join(
+        Order, Order.id == Payment.order_id
+    ).filter(
+        Order.restaurant_id == str(current_user.restaurant_id),
+        Payment.created_at >= start_date,
+        Payment.created_at <= end_date
+    ).group_by(
+        Payment.payment_mode
+    ).all()
+
+    return {
+        "methods": [
+            {
+                "method": r.payment_mode.value if r.payment_mode else "Unknown",
+                "count": int(r.count or 0),
+                "total": round(float(r.total or 0), 2)
+            }
+            for r in results
+        ]
+    }
 
 # ── Daily Summaries (Stored Snapshots) ──
 

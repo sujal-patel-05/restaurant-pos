@@ -402,7 +402,7 @@ ONLINE_ORDER_INTERVAL_MINUTES=5
 
 ## 10. Future Scope
 
-1. **Voice-Based Ordering** — Integrate speech-to-text for hands-free POS operation
+1. **Twilio Voice Integration** — Eva now handles real phone calls via Twilio.
 2. **Computer Vision** — Camera-based plate recognition for automated billing
 3. **Recommendation Engine** — Suggest upsells based on order history
 4. **Real Zomato/Swiggy API Integration** — Replace simulation with live platform APIs
