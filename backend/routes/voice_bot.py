@@ -53,8 +53,12 @@ router = APIRouter(prefix="/api/voice-bot", tags=["Voice Bot"])
 # AI Services: STT, TTS, LLM
 # ═══════════════════════════════════════════════════════════════════════════════
 
-async def sarvam_stt(audio_path: str) -> str:
-    """Transcribe audio using Sarvam AI STT with Groq Whisper fallback."""
+async def sarvam_stt(audio_path: str, menu_hint: str = "") -> str:
+    """Transcribe audio using Sarvam AI STT with Groq Whisper fallback.
+    
+    menu_hint: comma-separated menu item names passed as context to improve
+    food-word recognition accuracy (e.g. 'Butter Chicken, Paneer Tikka').
+    """
     import httpx
 
     sarvam_key = getattr(settings, 'SARVAM_API_KEY', None) or os.getenv('SARVAM_API_KEY', '')
@@ -62,11 +66,16 @@ async def sarvam_stt(audio_path: str) -> str:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 with open(audio_path, "rb") as f:
+                    form_data = {
+                        "language_code": "hi-IN",
+                        "model": "saaras:v3",
+                        "with_disfluencies": "false",  # Remove ums/ahs for cleaner text
+                    }
                     resp = await client.post(
                         "https://api.sarvam.ai/speech-to-text",
                         headers={"api-subscription-key": sarvam_key},
                         files={"file": f},
-                        data={"language_code": "hi-IN", "model": "saaras:v3"}
+                        data=form_data
                     )
                 
                 if resp.status_code == 200:
@@ -78,18 +87,26 @@ async def sarvam_stt(audio_path: str) -> str:
         except Exception as e:
             print(f"[EVA-STT] ❌ Exception: {e}")
 
-    # Fallback: Groq Whisper
+    # Fallback: Groq Whisper — inject menu items as prompt for better food-word accuracy
     if settings.GROQ_API_KEY:
         try:
             from groq import Groq
             groq_client = Groq(api_key=settings.GROQ_API_KEY)
+            # The prompt primes Whisper with known menu vocabulary so it transcribes
+            # food names correctly instead of hallucinating phonetically similar words.
+            whisper_prompt = (
+                f"Menu items: {menu_hint}. " if menu_hint else ""
+            ) + "Customer is ordering food in Hinglish (Hindi + English mix)."
             with open(audio_path, "rb") as f:
                 result = groq_client.audio.transcriptions.create(
                     file=("audio.wav", f.read()),
                     model="whisper-large-v3-turbo",
                     language="hi",
+                    prompt=whisper_prompt,
                 )
-            return result.text.strip() if result.text else ""
+            transcript = result.text.strip() if result.text else ""
+            print(f"[EVA-STT] ✅ Groq Whisper Result: {transcript}")
+            return transcript
         except Exception as e:
             logger.error(f"[EVA-STT] Groq fallback error: {e}")
     return ""
@@ -237,11 +254,17 @@ def fuzzy_match_menu(name: str, menu_data: list) -> dict | None:
         return menu_lookup[menu_lower[name.lower()]]
     # Fuzzy
     best_score, best_match = 0, None
+    name_lower = name.lower()
     for mn in menu_lookup:
-        score = SequenceMatcher(None, name.lower(), mn.lower()).ratio()
+        # Primary: sequence match
+        score = SequenceMatcher(None, name_lower, mn.lower()).ratio()
+        # Bonus: if the spoken name is a substring of the menu name or vice-versa
+        if name_lower in mn.lower() or mn.lower() in name_lower:
+            score = max(score, 0.70)
         if score > best_score:
             best_score, best_match = score, mn
-    if best_score >= 0.55 and best_match:
+    # Raised from 0.55 → 0.65 to avoid wrong item matches
+    if best_score >= 0.65 and best_match:
         return menu_lookup[best_match]
     return None
 
@@ -387,6 +410,8 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
         )
         menu_data = [{"id": str(item.id), "name": item.name, "price": float(item.price)} for item in menu_items]
         menu_list = "\n".join([f"- {m['name']} (₹{m['price']})" for m in menu_data])
+        # Comma-separated names passed to STT as vocabulary hint for better food-word accuracy
+        menu_hint = ", ".join(m["name"] for m in menu_data)
         restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
         restaurant_name = restaurant.name if restaurant else "Restaurant"
 
@@ -487,10 +512,16 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                 if not convert_to_wav(webm_path, wav_path):
                     continue
 
-                transcript = await sarvam_stt(wav_path)
+                # Pass menu_hint so STT AI knows the vocabulary to expect
+                transcript = await sarvam_stt(wav_path, menu_hint=menu_hint)
 
-                # Skip empty/noise transcripts
-                noise_words = {"", "thank you.", "thanks.", "bye.", "you", "the", "a", "is", "um", "hmm", "ok", "okay"}
+                # Extended noise filter — single words / common noise phrases
+                noise_words = {
+                    "", "you", "the", "a", "is", "um", "hmm", "oh", "ah", "uh",
+                    "ok", "okay", "thank you", "thank you.", "thanks", "thanks.",
+                    "bye", "bye.", "hello", "hi", "hey", "haan", "ha",
+                    "music", ".", "...", "applause", "[music]", "[applause]",
+                }
                 if not transcript or transcript.lower().strip().rstrip(".") in noise_words:
                     print(f"[EVA] 🔇 Filtered out noise transcript: '{transcript}'")
                     continue
