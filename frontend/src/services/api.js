@@ -3,12 +3,13 @@ import axios from 'axios';
 // Dynamically determine the backend URL based on where the frontend is hosted
 // This prevents IPv4 vs IPv6 'localhost' resolution issues on Windows
 const getBaseUrl = () => {
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-    // If we're running locally, use the exact same hostname but port 8000
-    if (typeof window !== 'undefined' && window.location.hostname) {
-        return `http://${window.location.hostname}:8000`;
+    let url = import.meta.env.VITE_API_URL;
+    if (!url && typeof window !== 'undefined' && window.location.hostname) {
+        url = `http://${window.location.hostname}:8000`;
     }
-    return 'http://127.0.0.1:8000';
+    url = url || 'http://127.0.0.1:8000';
+    // Remove trailing slash if present to avoid double-slash issues (e.g. //api)
+    return url.replace(/\/+$/, '');
 };
 
 const API_BASE_URL = getBaseUrl();
