@@ -57,4 +57,39 @@ class Settings(BaseSettings):
         case_sensitive = True
         extra = "ignore"
 
-settings = Settings()
+try:
+    settings = Settings()
+except Exception as e:
+    print(f"\n[FATAL] Configuration Error: {e}")
+    # Provide a fallback for the app to at least start and log the error
+    class FallbackSettings:
+        DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fallback.db")
+        SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-12345")
+        ALGORITHM = "HS256"
+        ACCESS_TOKEN_EXPIRE_MINUTES = 60
+        CORS_ORIGINS = "*"
+        APP_NAME = "Restaurant POS (Fallback Mode)"
+        DEBUG = True
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        OLLAMA_BASE_URL = "http://localhost:11434"
+        OLLAMA_MODEL = "tinyllama"
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        GROQ_MODEL = "llama-3.3-70b-versatile"
+        AI_PROVIDER = "groq"
+        SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
+        TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+        TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+        TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+        OWNER_EMAIL = os.getenv("OWNER_EMAIL")
+        SMTP_SERVER = "smtp.gmail.com"
+        SMTP_PORT = 587
+        SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+        SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+        AGENT_SCHEDULE_HOUR = 8
+        
+        @property
+        def cors_origins_list(self):
+            return ["*"]
+
+    settings = FallbackSettings()
+    print("[WARN] Using Fallback Settings. Please check your Environment Variables on Render.")
