@@ -4,6 +4,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { InstallAppButton } from './InstallAppButton';
 import { AIChatWidget } from './AIChatWidget';
 import OnlineOrderNotification from './OnlineOrderNotification';
+import posLogo from '../../img/5ivePOSS_F.png';
 import {
     LayoutDashboard,
     ShoppingCart,
@@ -30,7 +31,8 @@ import {
     ExternalLink,
     FileText,
     User, // Added User icon
-    Shield // Added Shield icon
+    Shield, // Added Shield icon
+    TrendingUp, // Revenue Intelligence
 } from 'lucide-react';
 
 // Reusable Layout Component
@@ -67,12 +69,13 @@ export const AppLayout = ({ children, title, subtitle }) => {
     };
 
     const navItems = [
-        { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+        { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
         { path: '/pos', icon: <ShoppingCart size={20} />, label: 'POS Terminal' },
         { path: '/kds', icon: <ChefHat size={20} />, label: 'Kitchen Display' },
         { path: '/menu', icon: <Menu size={20} />, label: 'Menu' },
         { path: '/inventory', icon: <Package size={20} />, label: 'Inventory' },
         { path: '/reports', icon: <BarChart3 size={20} />, label: 'Reports' },
+        { path: '/revenue', icon: <TrendingUp size={20} />, label: 'Revenue Intel' },
         { path: '/ask-ai', icon: <Sparkles size={20} />, label: 'Ask AI' },
         { path: '/agents', icon: <Brain size={20} />, label: 'AI Insights' },
         { label: 'Eva Bot / Digital Call', icon: <Phone size={20} />, path: '/order-call/T1' },
@@ -84,12 +87,25 @@ export const AppLayout = ({ children, title, subtitle }) => {
             <OnlineOrderNotification />
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-                <div className="sidebar-header">
-                    <div className="sidebar-logo">
-                        <div className="sidebar-logo-icon">
-                            <UtensilsCrossed size={20} color="white" />
-                        </div>
-                        <span>SujalPOS</span>
+                <div className="sidebar-header" style={{ padding: sidebarCollapsed ? '0 0.5rem' : '0' }}>
+                    <div className="sidebar-logo" style={{ margin: sidebarCollapsed ? '0 auto' : '0', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', paddingLeft: sidebarCollapsed ? '0' : '20px', width: '100%' }}>
+                        {sidebarCollapsed ? (
+                            <div className="sidebar-logo-icon">
+                                <UtensilsCrossed size={20} color="white" />
+                            </div>
+                        ) : (
+                            <img 
+                                src={posLogo} 
+                                alt="5ivePOS" 
+                                style={{ 
+                                    height: '50px', 
+                                    width: 'auto', 
+                                    objectFit: 'contain',
+                                    objectPosition: 'left center',
+                                    transition: 'all 0.3s ease'
+                                }} 
+                            />
+                        )}
                     </div>
                 </div>
 

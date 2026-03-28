@@ -200,7 +200,7 @@ class PDFService:
         # 4. ITEMS TABLE
         # ════════════════════════════════════════════════════════
         # Header row
-        table_header = ["#", "Item Description", "HSN/SAC", "Qty", "Rate (₹)", "Amount (₹)"]
+        table_header = ["#", "Item Description", "HSN/SAC", "Qty", "Rate (Rs)", "Amount (Rs)"]
         table_data = [table_header]
 
         items = getattr(order, 'order_items', []) or []
@@ -289,7 +289,7 @@ class PDFService:
             c.setFont(font, font_size)
             c.setFillColor(color)
             c.drawString(totals_x, y, label)
-            c.drawRightString(totals_x + totals_w, y, f"₹{value:,.2f}")
+            c.drawRightString(totals_x + totals_w, y, f"Rs. {value:,.2f}")
             y -= 16
 
         draw_total_row("Subtotal", subtotal)
@@ -307,7 +307,7 @@ class PDFService:
         c.setFont("Helvetica-Bold", 14)
         c.setFillColor(BRAND_DARK)
         c.drawString(totals_x, y, "GRAND TOTAL")
-        c.drawRightString(totals_x + totals_w, y, f"₹{total:,.2f}")
+        c.drawRightString(totals_x + totals_w, y, f"Rs. {total:,.2f}")
         y -= 20
 
         # ════════════════════════════════════════════════════════
@@ -482,8 +482,8 @@ class PDFService:
 
             c.drawString(left, y, name)
             c.drawRightString(left + content_w * 0.55, y, str(qty))
-            c.drawRightString(left + content_w * 0.75, y, f"{price:.0f}")
-            c.drawRightString(right, y, f"{amt:.2f}")
+            c.drawRightString(left + content_w * 0.75, y, f"Rs.{price:.0f}")
+            c.drawRightString(right, y, f"Rs.{amt:.2f}")
             y -= 3.5 * mm
 
         # ── Dashed divider ──
@@ -502,20 +502,20 @@ class PDFService:
 
         c.setFont("Helvetica", 7)
         c.drawString(left, y, "Subtotal")
-        c.drawRightString(right, y, f"{subtotal:.2f}")
+        c.drawRightString(right, y, f"Rs.{subtotal:.2f}")
         y -= 3 * mm
 
         c.drawString(left, y, f"CGST ({r_gst_pct/2:.1f}%)")
-        c.drawRightString(right, y, f"{half_gst:.2f}")
+        c.drawRightString(right, y, f"Rs.{half_gst:.2f}")
         y -= 3 * mm
 
         c.drawString(left, y, f"SGST ({r_gst_pct/2:.1f}%)")
-        c.drawRightString(right, y, f"{half_gst:.2f}")
+        c.drawRightString(right, y, f"Rs.{half_gst:.2f}")
         y -= 3 * mm
 
         if discount > 0:
             c.drawString(left, y, "Discount")
-            c.drawRightString(right, y, f"-{discount:.2f}")
+            c.drawRightString(right, y, f"-Rs.{discount:.2f}")
             y -= 3 * mm
 
         # Grand total
@@ -525,7 +525,7 @@ class PDFService:
         y -= 4 * mm
         c.setFont("Helvetica-Bold", 10)
         c.drawString(left, y, "TOTAL")
-        c.drawRightString(right, y, f"₹{total:.2f}")
+        c.drawRightString(right, y, f"Rs. {total:.2f}")
         y -= 1 * mm
         c.setLineWidth(0.8)
         c.line(left, y, right, y)

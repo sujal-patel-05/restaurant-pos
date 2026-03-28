@@ -6,6 +6,7 @@ from models.order import Order, OrderItem, KOT, OrderStatus, OrderType, OrderSou
 from models.billing import Payment, Invoice, Discount, PaymentMode
 from models.analytics import DailySummary
 from models.table_session import TableConfig, TableSession, VoiceOrderLog, SessionStatus
+from models.ai_chat import AIChatHistory
 
 __all__ = [
     "Restaurant",
@@ -29,5 +30,6 @@ __all__ = [
     "Discount",
     "PaymentMode",
     "DailySummary",
+    "AIChatHistory"
 ]
 

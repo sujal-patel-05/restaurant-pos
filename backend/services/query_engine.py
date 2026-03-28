@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from models import Order, MenuItem, Ingredient, OrderItem, WastageLog, OrderStatus
 from sqlalchemy import func, and_
+from services.revenue_intelligence_service import RevenueIntelligenceService
 
 class QueryEngine:
     """
@@ -32,6 +33,8 @@ class QueryEngine:
             return QueryEngine._query_menu(entities, db, restaurant_id)
         elif intent_type == "wastage_query":
             return QueryEngine._query_wastage(entities, db, restaurant_id)
+        elif intent_type == "revenue_intel":
+            return QueryEngine._query_revenue_intelligence(entities, db, restaurant_id)
         
         return {}
     
@@ -117,6 +120,17 @@ class QueryEngine:
         month_revenue = sum(float(s.total_revenue or 0) for s in recent_summaries)
         month_orders = sum(s.total_orders or 0 for s in recent_summaries)
             
+        # Only include chart data if there's enough for a trend (2+ points)
+        chart_info = None
+        if len(chart_data) > 1:
+            chart_info = {
+                "type": "bar",
+                "title": "Sales Trend",
+                "data": chart_data,
+                "dataKey": "sales",
+                "xAxisKey": "name"
+            }
+            
         return {
             "total_revenue": float(total_revenue) if total_revenue else 0.0,
             "total_orders": total_orders,
@@ -125,13 +139,7 @@ class QueryEngine:
             "last_7_days": {"revenue": week_revenue, "orders": week_orders},
             "last_30_days": {"revenue": month_revenue, "orders": month_orders},
             "daily_history": history[:14],  # Last 14 days for context
-            "chart_data": {
-                "type": "bar",
-                "title": "Sales Trend",
-                "data": chart_data,
-                "dataKey": "sales",
-                "xAxisKey": "name"
-            }
+            "chart_data": chart_info
         }
     
     @staticmethod
@@ -320,3 +328,27 @@ class QueryEngine:
                 for log in wastage_logs
             ]
         }
+
+    @staticmethod
+    def _query_revenue_intelligence(entities: Dict[str, Any], db: Session, restaurant_id: str) -> Dict[str, Any]:
+        """Query complex revenue intelligence metrics: margins, profitability, combos, pricing."""
+        days = entities.get('days', 30)
+        query_type = entities.get('query_sub_type', 'full_report')
+
+        if query_type == "margins":
+            return {"margins": RevenueIntelligenceService.get_contribution_margins(db, restaurant_id, days)}
+        elif query_type == "profitability":
+            return {"profitability": RevenueIntelligenceService.get_item_profitability(db, restaurant_id, days)}
+        elif query_type == "velocity":
+            return {"velocity": RevenueIntelligenceService.get_sales_velocity(db, restaurant_id, days)}
+        elif query_type == "combos":
+            return {"combos": RevenueIntelligenceService.get_combo_recommendations(db, restaurant_id, days)}
+        elif query_type == "upsells":
+            return {"upsells": RevenueIntelligenceService.get_upsell_priorities(db, restaurant_id, days)}
+        elif query_type == "pricing":
+            return {"price_recommendations": RevenueIntelligenceService.get_price_recommendations(db, restaurant_id, days)}
+        elif query_type == "inventory_signals":
+            return {"inventory_signals": RevenueIntelligenceService.get_inventory_signals(db, restaurant_id, days)}
+        
+        # Default: Full Report
+        return RevenueIntelligenceService.get_full_report(db, restaurant_id, days)

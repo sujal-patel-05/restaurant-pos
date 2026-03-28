@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Pages
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import POSTerminal from './pages/POSTerminal';
@@ -12,6 +13,7 @@ import BillingInterface from './pages/BillingInterface';
 import ReportsDashboard from './pages/ReportsDashboard';
 import AskAI from './pages/AskAI';
 import AgentInsights from './pages/AgentInsights';
+import RevenueIntelligence from './pages/RevenueIntelligence';
 import ProfileSettings from './pages/ProfileSettings';
 import WaiterLogin from './pages/WaiterLogin';
 import WaiterApp from './pages/WaiterApp';
@@ -25,6 +27,7 @@ function App() {
         <BrowserRouter>
             <Routes>
                 {/* Public Routes */}
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/waiter/login" element={<WaiterLogin />} />
                 <Route path="/waiter" element={<WaiterApp />} />
@@ -33,7 +36,7 @@ function App() {
 
                 {/* Protected Routes (Admin/Staff) */}
                 <Route element={<ProtectedRoute />}>
-                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/pos" element={<POSTerminal />} />
                     <Route path="/kds" element={<KDS />} />
                     <Route path="/menu" element={<MenuManagement />} />
@@ -42,6 +45,7 @@ function App() {
                     <Route path="/reports" element={<ReportsDashboard />} />
                     <Route path="/ask-ai" element={<AskAI />} />
                     <Route path="/agents" element={<AgentInsights />} />
+                    <Route path="/revenue" element={<RevenueIntelligence />} />
                     <Route path="/profile" element={<ProfileSettings />} />
                 </Route>
 

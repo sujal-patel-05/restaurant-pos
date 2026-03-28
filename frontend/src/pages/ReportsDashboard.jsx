@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { reportsAPI } from '../services/api';
 import {
@@ -10,8 +10,10 @@ import {
     Clock, Utensils, AlertTriangle, Globe, Store, Smartphone,
     RefreshCw, Calendar, BarChart3, PieChart as PieChartIcon,
     Activity, Layers, CreditCard, Wallet, Banknote,
-    Flame, Award, Target, Zap, Eye
+    Flame, Award, Target, Zap, Eye, Download
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { format, parseISO } from 'date-fns';
 
 /* ──────────────────────────────────────────────
@@ -167,6 +169,8 @@ function ReportsDashboard() {
     const [dateRange, setDateRange] = useState(7);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const reportRef = useRef(null);
     const [data, setData] = useState({
         sales: null, items: [], peakHours: [], ingredients: [], wastage: null,
         onlineVsOffline: null, forecast: null, dailyRevenue: [], categorySales: [], paymentMethods: [],
@@ -211,6 +215,101 @@ function ReportsDashboard() {
     useEffect(() => { fetchReports(); }, [fetchReports]);
 
     const handleRefresh = () => { setRefreshing(true); fetchReports(); };
+
+    const handleDownloadPDF = async () => {
+        if (!reportRef.current || downloading) return;
+        setDownloading(true);
+        try {
+            const element = reportRef.current;
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: null,
+                windowWidth: element.scrollWidth,
+                windowHeight: element.scrollHeight,
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+
+            // Header
+            pdf.setFillColor(15, 23, 42);
+            pdf.rect(0, 0, pageW, 18, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(14);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('5ive POS — Reports & Analytics', 10, 12);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            const tabLabel = TABS.find(t => t.key === activeTab)?.label || activeTab;
+            pdf.text(`${tabLabel} | Last ${dateRange} Days`, pageW - 10, 12, { align: 'right' });
+
+            // Content image
+            const contentY = 22;
+            const contentMaxH = pageH - 30;
+            const contentMaxW = pageW - 14;
+            const imgAspect = canvas.width / canvas.height;
+            let imgW = contentMaxW;
+            let imgH = imgW / imgAspect;
+
+            if (imgH > contentMaxH) {
+                // Multi-page handling
+                const pxPerPage = Math.floor(canvas.height * (contentMaxH / imgH));
+                let yOffset = 0;
+                let page = 0;
+                while (yOffset < canvas.height) {
+                    if (page > 0) pdf.addPage();
+                    const sliceH = Math.min(pxPerPage, canvas.height - yOffset);
+                    const sliceCanvas = document.createElement('canvas');
+                    sliceCanvas.width = canvas.width;
+                    sliceCanvas.height = sliceH;
+                    const ctx = sliceCanvas.getContext('2d');
+                    ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+                    const sliceData = sliceCanvas.toDataURL('image/png');
+                    const sliceImgH = contentMaxW / (canvas.width / sliceH);
+                    if (page > 0) {
+                        pdf.setFillColor(15, 23, 42);
+                        pdf.rect(0, 0, pageW, 18, 'F');
+                        pdf.setTextColor(255, 255, 255);
+                        pdf.setFontSize(14);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text('5ive POS — Reports & Analytics', 10, 12);
+                        pdf.setFontSize(9);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.text(`${tabLabel} | Last ${dateRange} Days (Page ${page + 1})`, pageW - 10, 12, { align: 'right' });
+                    }
+                    pdf.addImage(sliceData, 'PNG', 7, contentY, contentMaxW, sliceImgH);
+                    yOffset += sliceH;
+                    page++;
+                }
+            } else {
+                pdf.addImage(imgData, 'PNG', 7, contentY, imgW, imgH);
+            }
+
+            // Footer
+            const totalPages = pdf.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                pdf.setPage(i);
+                pdf.setFillColor(248, 250, 252);
+                pdf.rect(0, pageH - 8, pageW, 8, 'F');
+                pdf.setTextColor(100, 116, 139);
+                pdf.setFontSize(7);
+                pdf.text(`Generated on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 10, pageH - 3);
+                pdf.text(`Page ${i} of ${totalPages}`, pageW - 10, pageH - 3, { align: 'right' });
+            }
+
+            const fileName = `5ivePOS_Report_${tabLabel.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+            pdf.save(fileName);
+        } catch (err) {
+            console.error('PDF generation error:', err);
+            alert('Failed to generate PDF. Please try again.');
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     const avgOrderValue = data.sales ? Math.round(data.sales.average_order_value || 0) : 0;
     const totalRevenue = data.sales?.total_sales || 0;
@@ -731,10 +830,19 @@ function ReportsDashboard() {
                         >
                             <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : {}} /> Refresh
                         </button>
+                        <button style={{ ...S.refreshBtn, background: downloading ? 'var(--primary)' : 'var(--bg-surface)', color: downloading ? '#fff' : 'var(--text-main)', cursor: downloading ? 'wait' : 'pointer' }} onClick={handleDownloadPDF}
+                            onMouseEnter={e => { if (!downloading) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; } }}
+                            onMouseLeave={e => { if (!downloading) { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                            disabled={downloading}
+                        >
+                            <Download size={14} style={downloading ? { animation: 'spin 1s linear infinite' } : {}} /> {downloading ? 'Generating...' : 'Download PDF'}
+                        </button>
                         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
                     </div>
                 </div>
-                {tabContent[activeTab]?.()}
+                <div ref={reportRef}>
+                    {tabContent[activeTab]?.()}
+                </div>
             </div>
         </AppLayout>
     );

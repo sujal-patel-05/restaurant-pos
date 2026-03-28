@@ -3,15 +3,34 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import settings
 
-# Create database engine with SQLite-specific configuration
+# ── Fix Supabase URL ──
+# Supabase gives you: postgres://user:pass@host:port/db
+# SQLAlchemy requires:  postgresql://user:pass@host:port/db
+database_url = settings.DATABASE_URL
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+# ── Engine Configuration ──
 connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
+engine_kwargs = {}
+
+if database_url.startswith("sqlite"):
     # SQLite specific: allow same thread for FastAPI
     connect_args = {"check_same_thread": False}
+else:
+    # PostgreSQL (Supabase) — use connection pooling for production
+    engine_kwargs = {
+        "pool_size": 5,          # Keep 5 connections open
+        "max_overflow": 10,      # Allow 10 extra connections under load
+        "pool_timeout": 30,      # Wait up to 30s for a free connection
+        "pool_recycle": 1800,    # Recycle connections every 30 min (prevents stale connections)
+        "pool_pre_ping": True,   # Test connections before using them (important for Supabase)
+    }
 
 engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args
+    database_url,
+    connect_args=connect_args,
+    **engine_kwargs
 )
 
 # Create session factory

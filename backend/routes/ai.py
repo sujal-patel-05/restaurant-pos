@@ -69,13 +69,21 @@ def chat(
         
         # Store in conversation history
         from schemas.ai_schemas import ChatMessage
+        
+        restaurant_id_str = str(current_user.restaurant_id)
+        user_id_str = str(current_user.id)
+        
         ai_service.add_to_conversation(
             conversation_id,
-            ChatMessage(role="user", content=request.message)
+            ChatMessage(role="user", content=request.message),
+            restaurant_id_str,
+            user_id_str
         )
         ai_service.add_to_conversation(
             conversation_id,
-            ChatMessage(role="assistant", content=response_message)
+            ChatMessage(role="assistant", content=response_message),
+            restaurant_id_str,
+            user_id_str
         )
         
         return ChatResponse(
@@ -103,7 +111,11 @@ def get_history(
 ):
     """Get conversation history"""
     ai_service = get_ai_service()
-    messages = ai_service.get_conversation(conversation_id)
+    messages = ai_service.get_conversation(
+        conversation_id, 
+        str(current_user.restaurant_id), 
+        str(current_user.id)
+    )
     
     return {
         "conversation_id": conversation_id,
@@ -128,7 +140,7 @@ def list_conversations(
 ):
     """List all conversations for the sidebar"""
     ai_service = get_ai_service()
-    return {"conversations": ai_service.list_conversations()}
+    return {"conversations": ai_service.list_conversations(str(current_user.restaurant_id), str(current_user.id))}
 
 @router.delete("/conversations/{conversation_id}")
 def delete_conversation(
@@ -137,7 +149,7 @@ def delete_conversation(
 ):
     """Delete a conversation"""
     ai_service = get_ai_service()
-    deleted = ai_service.delete_conversation(conversation_id)
+    deleted = ai_service.delete_conversation(conversation_id, str(current_user.restaurant_id), str(current_user.id))
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"status": "deleted", "conversation_id": conversation_id}

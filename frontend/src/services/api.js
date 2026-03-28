@@ -150,4 +150,15 @@ export const agentsAPI = {
     getBrief: (runId) => api.get(`/api/agents/brief/${runId}`),
 };
 
+// Revenue Intelligence API
+export const revenueIntelligenceAPI = {
+    getFullReport: (days = 30) => api.get('/api/revenue-intelligence/full-report', { params: { days } }),
+    getMargins: (days = 30) => api.get('/api/revenue-intelligence/margins', { params: { days } }),
+    getProfitability: (days = 30) => api.get('/api/revenue-intelligence/profitability', { params: { days } }),
+    getVelocity: (days = 30) => api.get('/api/revenue-intelligence/velocity', { params: { days } }),
+    getCombos: (days = 30) => api.get('/api/revenue-intelligence/combos', { params: { days } }),
+    getUpsells: (days = 30) => api.get('/api/revenue-intelligence/upsells', { params: { days } }),
+    getPriceRecommendations: (days = 30) => api.get('/api/revenue-intelligence/price-recommendations', { params: { days } }),
+};
+
 export default api;

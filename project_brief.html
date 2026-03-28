@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SujalPOS — Project Technical Brief</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --bg-body: #0a0c10;
+            --bg-card: #111827;
+            --text-main: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --border: rgba(255, 255, 255, 0.1);
+            --gradient-1: linear-gradient(135deg, #6366f1, #a855f7);
+            --gradient-2: linear-gradient(135deg, #10b981, #3b82f6);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* --- Header Section --- */
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding: 40px;
+            background: var(--bg-card);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            z-index: 0;
+        }
+
+        .project-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: var(--gradient-1);
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #fff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* --- Stats Row --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+
+        .stat-value {
+            display: block;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary-light);
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- Sections --- */
+        section {
+            margin-bottom: 40px;
+            background: var(--bg-card);
+            padding: 35px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #fff;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .feature-item {
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .feature-title {
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* --- Technical Meta --- */
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            padding: 5px 12px;
+            background: #1f2937;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #d1d5db;
+        }
+
+        /* --- Logic Flow --- */
+        .academic-summary {
+            font-size: 15px;
+            color: #d1d5db;
+            text-align: justify;
+            background: rgba(99, 102, 241, 0.05);
+            padding: 20px;
+            border-left: 4px solid var(--primary);
+            margin-bottom: 20px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .highlight { color: var(--accent); font-weight: 600; }
+
+        @media (max-width: 768px) {
+            .feature-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <span class="project-badge">Production Grade AI Application</span>
+        <h1>SujalPOS</h1>
+        <p class="subtitle">An Advanced AI-Powered Restaurant Point-of-Sale System with Autonomous Revenue Intelligence</p>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-value">29,380+</span>
+            <span class="stat-label">Lines of Code</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">9+</span>
+            <span class="stat-label">AI Modules</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">13</span>
+            <span class="stat-label">Database Tables</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">FastAPI</span>
+            <span class="stat-label">Backend Stack</span>
+        </div>
+    </div>
+
+    <section>
+        <h2>Abstract Overview</h2>
+        <div class="academic-summary">
+            SujalPOS represents a paradigm shift in restaurant hospitality technology, transitioning from a reactive transactional tool to a 
+            <span class="highlight">proactive intelligence engine</span>. By integrating Large Language Models (LLM), autonomous Multi-Agent Systems (MAS), and 
+            statistical forecasting, it empowers restaurateurs with real-time semantic querying and data-driven operational strategies. The architecture 
+            seamlessly bridges high-speed POS operations with deep analytical insight.
+        </div>
+        <div class="tech-tags">
+            <span class="tag">FastAPI</span>
+            <span class="tag">React.js</span>
+            <span class="tag">CrewAI</span>
+            <span class="tag">Groq LLM</span>
+            <span class="tag">Llama 3.3 70B</span>
+            <span class="tag">SQLAlchemy</span>
+            <span class="tag">NumPy</span>
+            <span class="tag">SQLite</span>
+        </div>
+    </section>
+
+    <section>
+        <h2>Advanced Intelligence Features</h2>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <span class="feature-title">Ask AI (NLP Chatbot)</span>
+                <p class="feature-desc">A natural language interface allowing staff to query sales, inventory, and wastage using plain English. Powered by a hybrid intent-classification pipeline and Groq-hosted Llama 3 models.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Revenue Intelligence Engine</span>
+                <p class="feature-desc">A sophisticated module performing high-fidelity margin analysis, menu engineering (BCG Matrix), and association analysis to recommend automated combos and price optimizations.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Multi-Agent Planning (CrewAI)</span>
+                <p class="feature-desc">Four autonomous agents (Sales, Inventory, Pricing, and Co-Pilot) collaborate daily to synthesize complex data into a unified, actionable morning brief for the restaurant owner.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Predictive Sales Forecasting</span>
+                <p class="feature-desc">Utilizes Degree-2 Polynomial Regression via NumPy to simulate and forecast future revenue trends based on historical cyclicality and growth patterns.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Core Operational Modules</h2>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <span class="feature-title">Omni-Channel KDS</span>
+                <p class="feature-desc">A unified Kitchen Display System handling dine-in, takeaway, and simulated Zomato/Swiggy orders with real-time preparation timers and status synchronization.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Dynamic Inventory Mgmt</span>
+                <p class="feature-desc">Real-time stock tracking with Bill of Materials (BOM) linking. Includes auto-deduction, reorder level alerts, and AI-predicted stockout horizons.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Automated Billing & GST</span>
+                <p class="feature-desc">Comprehensive fiscal module generating compliant PDF invoices, handling multi-mode payments (UPI/Cash/Card), and automated email dispatch.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Eva: Voice Call Order AI</span>
+                <p class="feature-desc">A Twilio-integrated voice agent capable of answering phone calls and taking orders directly into the POS system using Whisper and Groq APIs.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Technical Statistics</h2>
+        <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">The project is a significant full-stack undertaking with high code density and modularity.</p>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <span class="feature-title">Backend Complexity</span>
+                <p class="feature-desc">13,100+ lines of Python code implementing async services, 13 complex SQLAlchemy models, and high-security JWT authentication.</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-title">Frontend Sophistication</span>
+                <p class="feature-desc">14,000+ lines of React.js code across 15+ premium pages, utilizing Recharts for visualization and Framer Motion for glassmorphic animations.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Developed with precision by Sujal Patel</p>
+        <p style="font-size: 11px; margin-top: 8px; opacity: 0.6;">© 2026 SujalPOS · Academic Capstone Project · B.Tech CSE (AI/ML)</p>
+    </footer>
+</div>
+
+</body>
+</html>

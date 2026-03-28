@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Ingredient, Restaurant
+from routes.auth import get_current_user
+from models import Ingredient, Restaurant, User
 from schemas.inventory_schemas import (
     IngredientCreate, IngredientUpdate, IngredientResponse
 )
@@ -11,26 +12,17 @@ from typing import List
 
 router = APIRouter(prefix="/api/inventory", tags=["Inventory Management"])
 
-# Helper function to get default restaurant
-def get_default_restaurant(db: Session):
-    """Get the first restaurant in the database (for demo purposes without auth)"""
-    restaurant = db.query(Restaurant).first()
-    if not restaurant:
-        raise HTTPException(status_code=404, detail="No restaurant found. Please create a restaurant first.")
-    return restaurant
-
 # Ingredients
 @router.post("/ingredients", response_model=IngredientResponse)
 def create_ingredient(
     ingredient_data: IngredientCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new ingredient"""
-    restaurant = get_default_restaurant(db)
-    
     # Check if ingredient name already exists
     existing = db.query(Ingredient).filter(
-        Ingredient.restaurant_id == restaurant.id,
+        Ingredient.restaurant_id == current_user.restaurant_id,
         Ingredient.name == ingredient_data.name
     ).first()
     
@@ -38,7 +30,7 @@ def create_ingredient(
         raise HTTPException(status_code=400, detail=f"Ingredient '{ingredient_data.name}' already exists")
     
     new_ingredient = Ingredient(
-        restaurant_id=restaurant.id,
+        restaurant_id=current_user.restaurant_id,
         **ingredient_data.dict()
     )
     db.add(new_ingredient)
@@ -48,27 +40,25 @@ def create_ingredient(
 
 @router.get("/ingredients", response_model=List[IngredientResponse])
 def get_ingredients(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get all ingredients for the restaurant"""
-    restaurant = get_default_restaurant(db)
-    
     ingredients = db.query(Ingredient).filter(
-        Ingredient.restaurant_id == restaurant.id
+        Ingredient.restaurant_id == current_user.restaurant_id
     ).all()
     return ingredients
 
 @router.get("/ingredients/{ingredient_id}", response_model=IngredientResponse)
 def get_ingredient(
     ingredient_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get a specific ingredient"""
-    restaurant = get_default_restaurant(db)
-    
     ingredient = db.query(Ingredient).filter(
         Ingredient.id == str(ingredient_id),
-        Ingredient.restaurant_id == restaurant.id
+        Ingredient.restaurant_id == current_user.restaurant_id
     ).first()
     
     if not ingredient:
@@ -80,14 +70,13 @@ def get_ingredient(
 def update_ingredient(
     ingredient_id: UUID,
     ingredient_data: IngredientUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Update an ingredient"""
-    restaurant = get_default_restaurant(db)
-    
     ingredient = db.query(Ingredient).filter(
         Ingredient.id == str(ingredient_id),
-        Ingredient.restaurant_id == restaurant.id
+        Ingredient.restaurant_id == current_user.restaurant_id
     ).first()
     
     if not ingredient:
@@ -96,7 +85,7 @@ def update_ingredient(
     # Check if new name conflicts with existing ingredient
     if ingredient_data.name and ingredient_data.name != ingredient.name:
         existing = db.query(Ingredient).filter(
-            Ingredient.restaurant_id == restaurant.id,
+            Ingredient.restaurant_id == current_user.restaurant_id,
             Ingredient.name == ingredient_data.name,
             Ingredient.id != str(ingredient_id)
         ).first()
@@ -147,19 +136,19 @@ def delete_ingredient(
 # Alerts
 @router.get("/alerts/low-stock")
 def get_low_stock_alerts(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get low stock alerts"""
-    restaurant = get_default_restaurant(db)
-    alerts = InventoryService.get_low_stock_alerts(db, restaurant.id)
+    alerts = InventoryService.get_low_stock_alerts(db, current_user.restaurant_id)
     return alerts
 
 @router.get("/alerts/expiry")
 def get_expiry_alerts(
     days: int = 7,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get expiry alerts"""
-    restaurant = get_default_restaurant(db)
-    alerts = InventoryService.get_expiry_alerts(db, restaurant.id, days)
+    alerts = InventoryService.get_expiry_alerts(db, current_user.restaurant_id, days)
     return alerts

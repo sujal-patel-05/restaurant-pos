@@ -17,14 +17,32 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     """
-    Production-grade AI service for POS chatbot
-    Uses rule-based intent classification with fallback to LLM
+    Production-grade AI service for POS chatbot.
+    
+    Uses a 3-Layer Ensemble NLP Pipeline for intent classification:
+      Layer 1: TF-IDF + SVM (scikit-learn) — fast trained classifier
+      Layer 2: Semantic Embeddings (sentence-transformers) — deep understanding
+      Layer 3: LLM Fallback (Groq Llama 3.3 70B) — ultimate fallback
+    
+    Falls back to rule-based classification if ensemble models are not trained.
     """
     
     def __init__(self):
         self.schema_context = get_schema_context()
         self.api_context = get_api_endpoints_context()
         self.conversations: Dict[str, list] = {}
+        
+        # ── Initialize Ensemble NLP Classifier ──
+        self.ensemble_classifier = None
+        try:
+            from services.ensemble_classifier import get_ensemble_classifier
+            self.ensemble_classifier = get_ensemble_classifier()
+            if self.ensemble_classifier.is_trained:
+                logger.info("✅ Ensemble NLP Classifier loaded (SVM + Embeddings)")
+            else:
+                logger.warning("⚠️ Ensemble models not trained — using rule-based fallback. Run: python train_ensemble.py")
+        except Exception as e:
+            logger.warning(f"Ensemble classifier not available: {e}")
         
         # Initialize AI Provider - prefer Groq for production speed
         self.provider = getattr(settings, 'AI_PROVIDER', 'groq').lower()
@@ -49,22 +67,50 @@ class AIService:
     
     def classify_intent(self, message: str) -> Intent:
         """
-        Classify user intent using Hybrid Approach (Rule-Based + Local LLM)
-        Prioritizes Rule-Based for speed, falls back to LLM for complexity
+        Classify user intent using the 3-Layer Ensemble NLP Pipeline.
+        
+        Pipeline:
+          1. Ensemble Classifier (SVM + Embeddings) — runs first (<15ms)
+          2. If ensemble is confident → extract entities via rule-based helpers
+          3. If ensemble is unsure → fallback to LLM (Groq Llama 3.3 70B)
+          4. If ensemble not trained → fallback to legacy rule-based classifier
         """
         
-        # 1. Try Rule-Based Classification FIRST (Instant)
-        intent = self._rule_based_classification(message)
-        
-        # 2. If Rule-Based found a specific intent (not general), return it
-        if intent.intent_type != 'general' and intent.confidence > 0.6:
-            print(f"✅ Rule-based match: {intent.intent_type}")
-            return intent
+        # ── Layer 1+2: Ensemble Classification (SVM + Embeddings) ──
+        if self.ensemble_classifier and self.ensemble_classifier.is_trained:
+            ensemble_result = self.ensemble_classifier.classify(message)
             
-        # 3. If Rule-Based failed or returned general, try LLM (Llama 2)
+            if ensemble_result["method"] != "llm_required":
+                # Ensemble is confident — use its result
+                intent_type = ensemble_result["intent"]
+                confidence = ensemble_result["confidence"]
+                method = ensemble_result["method"]
+                
+                # Extract entities using rule-based helpers
+                entities = self._extract_entities(message, intent_type)
+                
+                print(f"🎯 Ensemble [{method}]: {intent_type} ({confidence:.2f})")
+                print(f"   SVM: {ensemble_result['svm_result']} | EMB: {ensemble_result['embedding_result']}")
+                
+                return Intent(
+                    intent_type=intent_type,
+                    confidence=confidence,
+                    entities=entities,
+                    needs_data=intent_type != 'general'
+                )
+            else:
+                print("⚠️ Ensemble unsure, escalating to LLM...")
+        else:
+            # Ensemble not trained — try legacy rule-based first
+            intent = self._rule_based_classification(message)
+            if intent.intent_type != 'general' and intent.confidence > 0.6:
+                print(f"✅ Rule-based match: {intent.intent_type}")
+                return intent
+        
+        # ── Layer 3: LLM Fallback (Groq Llama 3.3 70B) ──
         if self.use_llm and self.llm_service:
             try:
-                print("⚠️ Rule-based failed, trying LLM...")
+                print("🔄 LLM classification (Layer 3)...")
                 intent_data = self.llm_service.classify_intent_with_llm(message)
                 if intent_data:
                     return Intent(
@@ -76,7 +122,44 @@ class AIService:
             except Exception as e:
                 print(f"LLM classification failed: {e}")
         
-        return intent
+        # ── Ultimate Fallback: Rule-based ──
+        return self._rule_based_classification(message)
+    
+    def _extract_entities(self, message: str, intent_type: str) -> Dict[str, Any]:
+        """
+        Extract relevant entities from the message based on the classified intent.
+        Uses rule-based extraction helpers (time period, order number, item name, etc.)
+        """
+        message_lower = message.lower()
+        entities = {}
+        
+        if intent_type in ("sales_query", "wastage_query"):
+            entities = self._extract_time_period(message_lower)
+        elif intent_type == "revenue_intel":
+            entities = self._extract_time_period(message_lower)
+            # Detect revenue intel sub-type
+            entities['query_sub_type'] = (
+                "margins" if "margin" in message_lower else
+                "profitability" if "profit" in message_lower else
+                "velocity" if "velocity" in message_lower or "popular" in message_lower or "bcg" in message_lower else
+                "combos" if "combo" in message_lower else
+                "upsells" if "upsell" in message_lower else
+                "pricing" if "price" in message_lower or "optimiz" in message_lower else
+                "inventory_signals" if "risk" in message_lower or "signal" in message_lower else
+                "full_report"
+            )
+        elif intent_type == "order_status":
+            order_number = self._extract_order_number(message)
+            if order_number:
+                entities["order_number"] = order_number
+        elif intent_type == "menu_info":
+            item_name = self._extract_item_name(message)
+            if item_name:
+                entities["item_name"] = item_name
+        elif intent_type == "create_order":
+            entities = self._extract_order_items(message)
+        
+        return entities
     
     def _rule_based_classification(self, message: str) -> Intent:
         """Rule-based intent classification (fallback)"""
@@ -91,7 +174,29 @@ class AIService:
             'growth', 'forecast', 'profit', 'loss', 'aov', 'daily'
         ])
         
-        # 1. Sales / analytics queries (CHECK FIRST — before order creation)
+        # 1. Revenue Intelligence / Menu Optimization (NEW HERO FEATURE - PRIORITIZE)
+        intel_keywords = ['margin', 'profitability', 'popular', 'velocity', 'combo', 'upsell', 'price optimization', 'hidden gem', 'bcg', 'risk', 'food cost']
+        if any(word in message_lower for word in intel_keywords):
+            entities = self._extract_time_period(message_lower)
+            # Detect sub-type
+            entities['query_sub_type'] = (
+                "margins" if "margin" in message_lower else
+                "profitability" if "profit" in message_lower else
+                "velocity" if "velocity" in message_lower or "popular" in message_lower or "bcg" in message_lower else
+                "combos" if "combo" in message_lower else
+                "upsells" if "upsell" in message_lower else
+                "pricing" if "price" in message_lower or "optimiz" in message_lower else
+                "inventory_signals" if "risk" in message_lower or "signal" in message_lower else
+                "full_report"
+            )
+            return Intent(
+                intent_type="revenue_intel",
+                confidence=0.95,
+                entities=entities,
+                needs_data=True
+            )
+
+        # 2. Sales / analytics queries
         sales_keywords = ['sales', 'revenue', 'earning', 'income', 'total order',
                          'how many order', 'order count', 'best selling', 'top selling',
                          'peak hour', 'aov', 'average order', 'compare', 'trend',
@@ -105,8 +210,8 @@ class AIService:
                 entities=entities,
                 needs_data=True
             )
-        
-        # 2. Inventory queries (including expiry)
+
+        # 3. Inventory queries (including expiry)
         if any(word in message_lower for word in ['stock', 'inventory', 'ingredient', 'low stock', 'reorder', 'expiry', 'expiring', 'expire', 'shelf life', 'expiration']):
             return Intent(
                 intent_type="inventory_query",
@@ -376,6 +481,8 @@ class AIService:
             response_text = self._format_menu_response(data, intent.entities)
         elif intent.intent_type == "wastage_query":
             response_text = self._format_wastage_response(data, intent.entities)
+        elif intent.intent_type == "revenue_intel":
+            response_text = self._format_revenue_intel_response(data, intent.entities)
         else:
             response_text = "I understood your question but I'm not sure how to answer it yet. Can you try rephrasing?"
             
@@ -633,137 +740,171 @@ Just ask me a question!"""
         response += "\n💡 **Tip**: Monitor wastage patterns to identify areas for improvement and reduce costs."
         
         return response
-    
-    def _format_order_response(self, data: Dict[str, Any], entities: Dict[str, Any]) -> str:
-        """Format order data into natural language"""
-        orders = data.get('orders', [])
+
+    def _format_revenue_intel_response(self, data: Dict[str, Any], entities: Dict[str, Any]) -> str:
+        """Format revenue intelligence data into natural language"""
+        sub_type = entities.get('query_sub_type', 'full_report')
         
-        if not orders:
-            return "No orders found matching your query."
+        response = "🧠 **Revenue Intelligence Report**\n\n"
         
-        if entities.get('order_number'):
-            # Single order detail
-            order = orders[0]
-            response = f"**Order #{order.get('order_number')}**\n\n"
-            response += f"Status: {order.get('status', 'Unknown').replace('_', ' ').title()}\n"
-            response += f"Total: ₹{order.get('total_amount', 0):,.2f}\n"
-            response += f"Items: {len(order.get('items', []))}\n"
-            return response
+        if sub_type == "margins":
+            margins = data.get('margins', [])
+            response += f"Found **{len(margins)} items** with detailed margin analysis.\n\n"
+            for m in margins[:5]:
+                response += f"• **{m['name']}**: {m['margin_pct']}% margin (₹{m['margin']} per unit)\n"
+        elif sub_type == "combos":
+            combos = data.get('combos', [])
+            response += f"Suggested **{len(combos)} combo deals** based on order patterns:\n\n"
+            for c in combos[:3]:
+                response += f"• **{c['item_a']} + {c['item_b']}**: Suggested Price ₹{c['suggested_combo_price']} ({c['discount_pct']}% off)\n"
+        elif sub_type == "upsells":
+            upsells = data.get('upsells', [])
+            response += f"Top **{len(upsells)} upselling opportunities**:\n\n"
+            for u in upsells[:3]:
+                response += f"• From **{u['base_item']}** to **{u['upsell_to']}** (Gain: ₹{u['monthly_profit_impact']} monthly profit)\n"
         else:
-            # List of orders
-            response = f"**Orders** ({len(orders)} found)\n\n"
-            for order in orders[:5]:
-                status = order.get('status', 'Unknown').replace('_', ' ').title()
-                response += f"• #{order.get('order_number')} - {status} - ₹{order.get('total_amount', 0):,.2f}\n"
-            
-            if len(orders) > 5:
-                response += f"\n...and {len(orders) - 5} more orders"
-            
-            return response
-    
-    def _format_menu_response(self, data: Dict[str, Any], entities: Dict[str, Any]) -> str:
-        """Format menu data into natural language"""
-        items = data.get('items', [])
-        
-        if not items:
-            return "No menu items found."
-        
-        if len(items) == 1:
-            # Single item detail
-            item = items[0]
-            response = f"**{item.get('name')}**\n\n"
-            response += f"💰 Price: ₹{item.get('price', 0):,.2f}\n"
-            response += f"📂 Category: {item.get('category_name', 'N/A')}\n"
-            response += f"✅ Available: {'Yes' if item.get('is_available') else 'No'}\n"
-            if item.get('description'):
-                response += f"\n{item.get('description')}"
-            return response
-        else:
-            # List of items
-            response = f"**Menu Items** ({len(items)} found)\n\n"
-            for item in items[:5]:
-                available = "✅" if item.get('is_available') else "❌"
-                response += f"{available} {item.get('name')} - ₹{item.get('price', 0):,.2f}\n"
-            
-            if len(items) > 5:
-                response += f"\n...and {len(items) - 5} more items"
-            
-            return response
-    
-    def _format_wastage_response(self, data: Dict[str, Any], entities: Dict[str, Any]) -> str:
-        """Format wastage data into natural language"""
-        period = entities.get('period', 'today')
-        total_cost = data.get('total_wastage_cost', 0)
-        wastage_details = data.get('wastage_details', [])
-        
-        response = f"**Wastage Report ({period.replace('_', ' ').title()})**\n\n"
-        response += f"💸 Total Wastage Cost: ₹{total_cost:,.2f}\n\n"
-        
-        if wastage_details:
-            response += "**Top Wastage Items:**\n"
-            for item in wastage_details[:5]:
-                name = item.get('ingredient_name', 'Unknown')
-                cost = item.get('cost', 0)
-                response += f"• {name}: ₹{cost:,.2f}\n"
+            summary = data.get('summary', {})
+            if summary:
+                response += f"Overall Performance ({summary.get('period_days')} days):\n"
+                response += f"• **Total Revenue**: ₹{summary.get('total_revenue', 0):,.2f}\n"
+                response += f"• **Total Profit**: ₹{summary.get('total_profit', 0):,.2f}\n"
+                response += f"• **Avg Margin**: {summary.get('avg_margin_pct', 0)}%\n"
+                response += f"• **Top Performer**: {summary.get('top_performer', 'N/A')}\n"
+            else:
+                response += "I've analyzed your menu performance. You can see detailed insights on the Revenue Intelligence dashboard, or ask me specifically about 'margins', 'combos', or 'profitable items'."
         
         return response
     
-    def add_to_conversation(self, conversation_id: str, message: ChatMessage):
-        """Add message to conversation history and track metadata"""
-        if conversation_id not in self.conversations:
-            self.conversations[conversation_id] = []
-        self.conversations[conversation_id].append(message)
+    def add_to_conversation(self, conversation_id: str, message: ChatMessage, restaurant_id: str, user_id: str):
+        """Add message to conversation history in the database"""
+        from database import SessionLocal
+        from models.ai_chat import AIChatHistory
         
-        # Track conversation metadata
-        if not hasattr(self, 'conversation_meta'):
-            self.conversation_meta = {}
-        
-        now = datetime.utcnow()
-        if conversation_id not in self.conversation_meta:
-            # Use first user message as title (truncated)
-            title = message.content[:60] + ('...' if len(message.content) > 60 else '') if message.role == 'user' else 'New Chat'
-            self.conversation_meta[conversation_id] = {
-                'title': title,
-                'created_at': now.isoformat(),
-                'updated_at': now.isoformat(),
-                'message_count': 0
-            }
-        self.conversation_meta[conversation_id]['updated_at'] = now.isoformat()
-        self.conversation_meta[conversation_id]['message_count'] = len(self.conversations[conversation_id])
+        db = SessionLocal()
+        try:
+            # Determine the title from the first user message
+            title = "New Chat"
+            if message.role == 'user':
+                # Check if this is the first message
+                existing = db.query(AIChatHistory).filter(AIChatHistory.conversation_id == conversation_id).first()
+                if not existing:
+                    title = message.content[:60] + ('...' if len(message.content) > 60 else '')
+                else:
+                    title = existing.title
+            else:
+                # If assistant, copy title from an existing message in the same conversation
+                existing = db.query(AIChatHistory).filter(AIChatHistory.conversation_id == conversation_id).first()
+                if existing:
+                    title = existing.title
+
+            chat_msg = AIChatHistory(
+                restaurant_id=restaurant_id,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                title=title,
+                role=message.role,
+                content=message.content
+            )
+            db.add(chat_msg)
+            db.commit()
+            
+            # Update memory cache for backward compatibility during this session
+            if conversation_id not in self.conversations:
+                self.conversations[conversation_id] = []
+            self.conversations[conversation_id].append(message)
+        except Exception as e:
+            logger.error(f"Failed to save chat history: {e}")
+            db.rollback()
+        finally:
+            db.close()
     
-    def get_conversation(self, conversation_id: str) -> list:
-        """Get conversation history"""
-        return self.conversations.get(conversation_id, [])
-    
-    def list_conversations(self) -> list:
-        """List all conversations with metadata, sorted by most recent"""
-        if not hasattr(self, 'conversation_meta'):
-            self.conversation_meta = {}
+    def get_conversation(self, conversation_id: str, restaurant_id: str, user_id: str) -> list:
+        """Get conversation history from database"""
+        from database import SessionLocal
+        from models.ai_chat import AIChatHistory
+        from schemas.ai_schemas import ChatMessage
         
-        convos = []
-        for cid, meta in self.conversation_meta.items():
-            convos.append({
-                'conversation_id': cid,
-                'title': meta.get('title', 'Untitled'),
-                'created_at': meta.get('created_at'),
-                'updated_at': meta.get('updated_at'),
-                'message_count': meta.get('message_count', 0)
-            })
-        
-        # Sort by updated_at descending (most recent first)
-        convos.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
-        return convos
+        db = SessionLocal()
+        try:
+            history = db.query(AIChatHistory).filter(
+                AIChatHistory.conversation_id == conversation_id,
+                AIChatHistory.restaurant_id == restaurant_id,
+                AIChatHistory.user_id == user_id
+            ).order_by(AIChatHistory.created_at.asc()).all()
+            
+            messages = []
+            for h in history:
+                messages.append(ChatMessage(role=h.role, content=h.content))
+                
+            # Fallback to cache if DB empty but cache has it (transitional safety)
+            if not messages and conversation_id in self.conversations:
+                return self.conversations[conversation_id]
+                
+            return messages
+        finally:
+            db.close()
     
-    def delete_conversation(self, conversation_id: str) -> bool:
-        """Delete a conversation"""
-        deleted = False
-        if conversation_id in self.conversations:
-            del self.conversations[conversation_id]
-            deleted = True
-        if hasattr(self, 'conversation_meta') and conversation_id in self.conversation_meta:
-            del self.conversation_meta[conversation_id]
-            deleted = True
-        return deleted
+    def list_conversations(self, restaurant_id: str, user_id: str) -> list:
+        """List all conversations for a user, sorted by most recent"""
+        from database import SessionLocal
+        from models.ai_chat import AIChatHistory
+        
+        db = SessionLocal()
+        try:
+            all_msgs = db.query(AIChatHistory).filter(
+                AIChatHistory.restaurant_id == restaurant_id,
+                AIChatHistory.user_id == user_id
+            ).order_by(AIChatHistory.created_at.desc()).all()
+            
+            convos_map = {}
+            for msg in all_msgs:
+                cid = msg.conversation_id
+                if cid not in convos_map:
+                    convos_map[cid] = {
+                        'conversation_id': cid,
+                        'title': msg.title,
+                        'created_at': msg.created_at.isoformat(),
+                        'updated_at': msg.created_at.isoformat(),
+                        'message_count': 1
+                    }
+                else:
+                    convos_map[cid]['message_count'] += 1
+                    # Keep oldest created_at, freshest updated_at
+                    if msg.created_at.isoformat() < convos_map[cid]['created_at']:
+                        convos_map[cid]['created_at'] = msg.created_at.isoformat()
+            
+            convos = list(convos_map.values())
+            # Sort by updated_at descending (most recent first)
+            convos.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+            return convos
+        finally:
+            db.close()
+    
+    def delete_conversation(self, conversation_id: str, restaurant_id: str, user_id: str) -> bool:
+        """Delete a conversation from the database"""
+        from database import SessionLocal
+        from models.ai_chat import AIChatHistory
+        
+        db = SessionLocal()
+        try:
+            deleted_count = db.query(AIChatHistory).filter(
+                AIChatHistory.conversation_id == conversation_id,
+                AIChatHistory.restaurant_id == restaurant_id,
+                AIChatHistory.user_id == user_id
+            ).delete()
+            db.commit()
+            
+            # Also remove from memory
+            if conversation_id in self.conversations:
+                del self.conversations[conversation_id]
+                
+            return deleted_count > 0
+        except Exception as e:
+            logger.error(f"Failed to delete conversation: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
 
 
 # Singleton instance

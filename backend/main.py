@@ -12,6 +12,7 @@ from routes.customer import router as customer_router, admin_router as table_adm
 from routes.call_orders import router as call_orders_router
 from routes.voice_bot import router as voice_bot_router
 from routes.twilio_bot import router as twilio_bot_router
+from routes.revenue_intelligence import router as revenue_intelligence_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -56,6 +57,7 @@ app.include_router(table_admin_router)
 app.include_router(call_orders_router)
 app.include_router(voice_bot_router)
 app.include_router(twilio_bot_router)
+app.include_router(revenue_intelligence_router)
 
 # Scheduler for daily agent analysis
 _scheduler = None

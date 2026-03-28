@@ -56,7 +56,8 @@ Chart types: `bar`, `line`, `pie`
 3. **Order Management** — track orders, check status, find specific orders
 4. **Menu Intelligence** — prices, availability, popular items, food cost
 5. **Wastage Tracking** — waste logs, reasons, cost impact
-6. **Business Insights** — actionable recommendations based on data patterns
+6. **Business Insights (Revenue Intelligence)** — actionable recommendations on margins, profitability, popularity (BCG Matrix), combo deals, upselling, and price optimization.
+7. **Menu Optimization** — identifying "Hidden Gems" (high margin, low sales) or "Workhorses" (high sales, low margin).
 
 ## Error Handling
 - If no data is returned, explain nicely: "I couldn't find any [X] for [period]. This could mean no [activity] has been recorded yet."
@@ -80,6 +81,7 @@ INTENT_CLASSIFICATION_PROMPT = """Classify this restaurant POS message into exac
 | `order_status` | Check/find specific orders | "Is order #123 ready?" |
 | `menu_info` | Item prices, availability, menu details | "How much is the pizza?" |
 | `wastage_query` | Waste logs, spoilage, food waste | "What was wasted this week?" |
+| `revenue_intel` | Margins, profit contribution, popular items (BCG), combo deals, pricing advice, under-promoted items | "Which items have the highest margin?", "Give me combo suggestions", "What are our hidden gems?" |
 | `general` | Greetings, capabilities, off-topic | "Hi", "What can you do?" |
 
 ## Few-Shot Examples
@@ -95,6 +97,10 @@ User: "Which items are running low?" → {{"intent_type":"inventory_query","conf
 User: "What's expiring soon?" → {{"intent_type":"inventory_query","confidence":0.95,"entities":{{}},"needs_data":true}}
 User: "Show me expired items" → {{"intent_type":"inventory_query","confidence":0.95,"entities":{{}},"needs_data":true}}
 User: "Which ingredients are about to expire?" → {{"intent_type":"inventory_query","confidence":0.96,"entities":{{}},"needs_data":true}}
+User: "What are our most profitable items?" → {{"intent_type":"revenue_intel","confidence":0.98,"entities":{{"query_sub_type":"profitability"}},"needs_data":true}}
+User: "Show me combo recommendations" → {{"intent_type":"revenue_intel","confidence":0.97,"entities":{{"query_sub_type":"combos"}},"needs_data":true}}
+User: "Which items have low margins but high volume?" → {{"intent_type":"revenue_intel","confidence":0.95,"entities":{{"query_sub_type":"velocity"}},"needs_data":true}}
+User: "Give me a full revenue intelligence report" → {{"intent_type":"revenue_intel","confidence":0.99,"entities":{{"query_sub_type":"full_report"}},"needs_data":true}}
 
 ## Time Period Extraction Rules
 - "today" → period: "today", days: 1

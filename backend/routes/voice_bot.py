@@ -155,7 +155,11 @@ async def sarvam_tts(text: str, lang: str = "hi-IN") -> str | None:
 
 
 async def sarvam_llm(system_prompt: str, user_msg: str) -> str:
-    """Call Sarvam LLM (primary) or Groq (fallback) for Eva's responses."""
+    """Call Sarvam LLM (primary) or Groq (fallback) for Eva's responses.
+    
+    Always strips <think> reasoning tags before returning to ensure clean
+    JSON output for downstream parsers.
+    """
     import httpx
 
     sarvam_key = getattr(settings, 'SARVAM_API_KEY', None) or os.getenv('SARVAM_API_KEY', '')
@@ -175,24 +179,32 @@ async def sarvam_llm(system_prompt: str, user_msg: str) -> str:
                     },
                 )
                 if resp.status_code == 200:
-                    return resp.json()["choices"][0]["message"]["content"].strip()
+                    raw = resp.json()["choices"][0]["message"]["content"].strip()
+                    cleaned = strip_think_tags(raw)
+                    print(f"[EVA-LLM] Sarvam response (cleaned): {cleaned[:200]}")
+                    return cleaned
+                else:
+                    print(f"[EVA-LLM] Sarvam API {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.error(f"[EVA-LLM] Sarvam error: {e}")
 
-    # Groq fallback
+    # Groq fallback — use the powerful 70B model for reliable JSON output
     if settings.GROQ_API_KEY:
         try:
             from groq import Groq
             groq_client = Groq(api_key=settings.GROQ_API_KEY)
             response = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_msg},
                 ],
                 max_tokens=700, temperature=0.15,
             )
-            return response.choices[0].message.content.strip()
+            raw = response.choices[0].message.content.strip()
+            cleaned = strip_think_tags(raw)
+            print(f"[EVA-LLM] Groq response (cleaned): {cleaned[:200]}")
+            return cleaned
         except Exception as e:
             logger.error(f"[EVA-LLM] Groq error: {e}")
     return ""
@@ -228,6 +240,61 @@ def strip_think_tags(text: str) -> str:
     return cleaned
 
 
+def _robust_json_parse(raw: str) -> dict:
+    """Parse JSON from LLM output using multiple fallback strategies.
+    
+    LLMs sometimes wrap JSON in markdown, add explanations, or include
+    <think> tags. This function tries multiple extraction strategies to
+    reliably get the JSON object out.
+    """
+    import re
+
+    # 1. Strip think tags first
+    cleaned = strip_think_tags(raw)
+
+    # 2. Try direct JSON parse (best case: clean JSON)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Remove markdown code block wrappers
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 4. Extract JSON object via regex (handles surrounding text)
+    json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", cleaned, re.DOTALL)
+    if json_match:
+        extracted = json_match.group(0)
+        try:
+            return json.loads(extracted)
+        except json.JSONDecodeError:
+            # 5. Try fixing common JSON issues (trailing commas, single quotes)
+            fixed = re.sub(r',\s*}', '}', extracted)
+            fixed = re.sub(r',\s*]', ']', fixed)
+            try:
+                return json.loads(fixed)
+            except json.JSONDecodeError:
+                pass
+
+    # 6. Last resort: find the outermost { ... } pair
+    first_brace = cleaned.find('{')
+    last_brace = cleaned.rfind('}')
+    if first_brace != -1 and last_brace > first_brace:
+        extracted = cleaned[first_brace:last_brace + 1]
+        try:
+            return json.loads(extracted)
+        except json.JSONDecodeError:
+            fixed = re.sub(r',\s*}', '}', extracted)
+            fixed = re.sub(r',\s*]', ']', fixed)
+            return json.loads(fixed)
+
+    raise json.JSONDecodeError("No JSON object found in LLM output", raw, 0)
+
+
 def get_time_greeting() -> str:
     """Dynamic time-based Hindi greeting."""
     hour = datetime.now().hour
@@ -240,8 +307,19 @@ def get_time_greeting() -> str:
 
 
 def fuzzy_match_menu(name: str, menu_data: list) -> dict | None:
-    """Fuzzy match an item name to the menu. Returns menu item dict or None."""
+    """Fuzzy match an item name to the menu. Returns menu item dict or None.
+    
+    Uses multiple strategies:
+    1. Exact match
+    2. Case-insensitive match
+    3. Word-overlap scoring (great for multi-word names like 'Margherita Pizza')
+    4. Substring matching
+    5. SequenceMatcher fuzzy ratio
+    """
     from difflib import SequenceMatcher
+
+    if not name or not name.strip():
+        return None
 
     menu_lookup = {m["name"]: m for m in menu_data}
     menu_lower = {m["name"].lower(): m["name"] for m in menu_data}
@@ -252,21 +330,138 @@ def fuzzy_match_menu(name: str, menu_data: list) -> dict | None:
     # Case-insensitive
     if name.lower() in menu_lower:
         return menu_lookup[menu_lower[name.lower()]]
-    # Fuzzy
+
+    # Word-overlap + fuzzy scoring
     best_score, best_match = 0, None
-    name_lower = name.lower()
+    name_lower = name.lower().strip()
+    name_words = set(name_lower.split())
+
     for mn in menu_lookup:
-        # Primary: sequence match
-        score = SequenceMatcher(None, name_lower, mn.lower()).ratio()
-        # Bonus: if the spoken name is a substring of the menu name or vice-versa
-        if name_lower in mn.lower() or mn.lower() in name_lower:
-            score = max(score, 0.70)
+        mn_lower = mn.lower()
+        mn_words = set(mn_lower.split())
+
+        # Primary: SequenceMatcher ratio
+        score = SequenceMatcher(None, name_lower, mn_lower).ratio()
+
+        # Bonus: substring matching (spoken name inside menu or vice-versa)
+        if name_lower in mn_lower or mn_lower in name_lower:
+            score = max(score, 0.75)
+
+        # Bonus: word overlap — if any significant word matches a menu word
+        # e.g. "margherita" in {"margherita", "pizza"} → strong match
+        common_words = name_words & mn_words
+        if common_words:
+            # Weight by how many menu-name words matched
+            word_overlap = len(common_words) / len(mn_words)
+            score = max(score, 0.50 + word_overlap * 0.35)
+
+        # Bonus: check if any individual word is a close match to a menu word
+        for nw in name_words:
+            if len(nw) < 3:
+                continue
+            for mw in mn_words:
+                if len(mw) < 3:
+                    continue
+                word_sim = SequenceMatcher(None, nw, mw).ratio()
+                if word_sim >= 0.75:
+                    score = max(score, 0.60 + word_sim * 0.2)
+
         if score > best_score:
             best_score, best_match = score, mn
-    # Raised from 0.55 → 0.65 to avoid wrong item matches
-    if best_score >= 0.65 and best_match:
+
+    # Threshold lowered to 0.55 to catch Hindi phonetic variations
+    if best_score >= 0.55 and best_match:
+        print(f"[EVA-MATCH] '{name}' → '{best_match}' (score: {best_score:.2f})")
         return menu_lookup[best_match]
+
+    print(f"[EVA-MATCH] ❌ No match for '{name}' (best: '{best_match}' @ {best_score:.2f})")
     return None
+
+
+def _get_smart_suggestions(current_order: list, menu_data: list) -> list:
+    """Get 1-2 complementary must-try suggestions the customer hasn't ordered.
+    
+    Uses food pairing logic to recommend items that go well together.
+    Returns list of dicts: [{"name": ..., "price": ..., "reason": ...}]
+    """
+    ordered_names = {o["name"].lower() for o in current_order}
+    ordered_categories = set()
+    
+    # Categorize what's already ordered
+    for name in ordered_names:
+        if "pizza" in name:
+            ordered_categories.add("pizza")
+        elif "burger" in name or "tikki" in name:
+            ordered_categories.add("burger")
+        elif "fries" in name:
+            ordered_categories.add("fries")
+        elif "shake" in name:
+            ordered_categories.add("shake")
+        elif "coke" in name or "drink" in name:
+            ordered_categories.add("drink")
+    
+    # Complementary pairing rules: {ordered_category → suggested items with reason}
+    pairings = {
+        "pizza": [
+            {"match": ["coke"], "reason": "Pizza ke saath Coke perfect combo hai!"},
+            {"match": ["fries", "cheesy fries"], "reason": "Fries ke saath pizza ka maza double ho jayega!"},
+        ],
+        "burger": [
+            {"match": ["fries", "regular fries", "cheesy fries"], "reason": "Burger ke saath Fries must-try hai!"},
+            {"match": ["shake", "strawberry thick shake"], "reason": "Shake ke saath burger ka perfect combo banega!"},
+            {"match": ["coke"], "reason": "Burger ke saath thandi Coke try karenge?"},
+        ],
+        "fries": [
+            {"match": ["coke"], "reason": "Fries ke saath Coke ekdum classic combo hai!"},
+            {"match": ["burger", "aloo tikki burger"], "reason": "Aloo Tikki Burger bhi add karenge? Bahut popular hai!"},
+        ],
+        "shake": [
+            {"match": ["pizza", "margherita pizza"], "reason": "Pizza try karenge? Shake ke saath best lagta hai!"},
+            {"match": ["fries", "cheesy fries"], "reason": "Cheesy Fries bhi le lo, perfect snack hai!"},
+        ],
+        "drink": [
+            {"match": ["fries", "regular fries", "cheesy fries"], "reason": "Fries bhi chahiye? Bahut tasty hai humare yahan!"},
+            {"match": ["burger", "aloo tikki burger"], "reason": "Aloo Tikki Burger try karenge? Must-try item hai!"},
+        ],
+    }
+    
+    suggestions = []
+    suggested_names = set()
+    
+    for cat in ordered_categories:
+        if cat not in pairings:
+            continue
+        for pairing in pairings[cat]:
+            for menu_item in menu_data:
+                item_lower = menu_item["name"].lower()
+                if item_lower in ordered_names:
+                    continue  # Already ordered
+                if item_lower in suggested_names:
+                    continue  # Already suggested
+                # Check if this menu item matches any pairing keyword
+                if any(kw in item_lower for kw in pairing["match"]):
+                    suggestions.append({
+                        "name": menu_item["name"],
+                        "price": menu_item["price"],
+                        "reason": pairing["reason"],
+                    })
+                    suggested_names.add(item_lower)
+                    if len(suggestions) >= 2:
+                        return suggestions
+    
+    # Fallback: suggest any popular item not ordered (first 2 from menu)
+    if not suggestions:
+        for item in menu_data:
+            if item["name"].lower() not in ordered_names:
+                suggestions.append({
+                    "name": item["name"],
+                    "price": item["price"],
+                    "reason": f"{item['name']} humara must-try item hai!",
+                })
+                if len(suggestions) >= 1:
+                    break
+    
+    return suggestions[:2]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -274,7 +469,8 @@ def fuzzy_match_menu(name: str, menu_data: list) -> dict | None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def build_order_prompt(restaurant_name: str, menu_list: str,
-                       conversation_history: list, current_order: list) -> str:
+                       conversation_history: list, current_order: list,
+                       menu_data: list = None, suggestion_given: bool = False) -> str:
     """Build the system prompt for Eva — the AI hostess."""
 
     history_text = "\n".join(
@@ -290,6 +486,16 @@ def build_order_prompt(restaurant_name: str, menu_list: str,
         total = sum(i['price'] * i['qty'] for i in current_order)
         current_order_text += f"\n  SUBTOTAL: ₹{int(total)}"
 
+    # Build smart suggestion context
+    suggestion_text = ""
+    if current_order and not suggestion_given and menu_data:
+        smart_suggestions = _get_smart_suggestions(current_order, menu_data)
+        if smart_suggestions:
+            suggestion_text = "\n🌟 MUST-TRY SUGGESTIONS (recommend these to the customer!):\n"
+            for s in smart_suggestions:
+                suggestion_text += f"  - {s['name']} (₹{s['price']}) — {s['reason']}\n"
+            suggestion_text += "  → Mention 1-2 of these naturally in your response_text as a must-try recommendation!"
+
     return f"""You are EVA, a warm, friendly, and experienced AI hostess/waiter at {restaurant_name}.
 You are talking to a customer on a PHONE CALL (voice). You take orders just like a REAL HUMAN waiter.
 
@@ -299,43 +505,57 @@ YOUR PERSONALITY:
 - You use natural filler words: "Ji", "Bilkul", "Zaroor", "Ekdum", "Accha"
 - You are FAST and EFFICIENT — don't give long speeches. Keep responses 1-3 sentences MAX
 - You sound like a REAL PERSON, not a robot. No "Main ek AI hoon" type disclaimers ever
-- You subtly suggest popular/complementary items (e.g., "Butter Naan ke saath Butter Chicken try karenge?")
-- CRITICAL: You ONLY accept items that are EXACTLY on the menu. If a customer asks for ANYTHING else (like "pizza", "burger", "coke" if not on the menu), you MUST politely refuse. "Maaf kijiye, humare pass [item name] nahi hai. Aap [alternative on menu] try kar sakte hain."
+- You PROACTIVELY suggest must-try complementary items (see MUST-TRY SUGGESTIONS section if present)
+- When suggesting, be enthusiastic: "Aur ek must-try item — humari [Item] bahut popular hai! [reason]. Try karenge?"
+- CRITICAL: You ONLY accept items that are EXACTLY on the menu. If a customer asks for ANYTHING not on the menu, politely refuse and suggest alternatives.
 
 MENU (ONLY these items can be ordered):
 {menu_list}
 
 {current_order_text}
+{suggestion_text}
 
 FULL CONVERSATION:
 {history_text}
 
-RESPOND IN STRICT JSON ONLY:
+⚠️ CRITICAL OUTPUT FORMAT: You MUST respond with ONLY a valid JSON object. NO explanations, NO markdown, NO code blocks, NO thinking text. Just the raw JSON object starting with {{ and ending with }}.
+
 {{
   "action": "take_order" | "modify_order" | "need_info" | "suggest" | "chitchat",
   "items": [{{"name": "exact menu item name", "qty": number}}],
-  "remove_items": ["items to remove from current order"],
-  "unavailable": ["items customer asked for but not on menu"],
-  "suggestion": "optional: a complementary item suggestion",
+  "remove_items": [],
+  "unavailable": [],
+  "suggestion": "",
   "response_text": "Eva's spoken response in natural Hinglish. MUST be short, warm, human-like.",
   "needs_more_info": false,
   "ready_to_confirm": false
 }}
 
+STT TRANSCRIPT HANDLING:
+- The customer's speech is transcribed by AI. It may contain Hindi, English, or Hinglish.
+- Map spoken words to menu items intelligently:
+  margherita/margarita/मार्गरिटा → Margherita Pizza
+  strawberry shake/स्ट्रॉबेरी शेक/thick shake → Strawberry Thick Shake
+  aloo tikki/आलू टिक्की → Aloo Tikki Burger
+  mexican/मेक्सिकन → Mexican Aloo Tikki
+  veg pizza/वेज पिज़्ज़ा/loaded → Veg Loaded Pizza
+  fries/फ्राइज → Regular Fries
+  cheesy fries/चीज़ी → Cheesy Fries
+  coke/कोक/cold drink → Coke
+
 CRITICAL RULES:
-1. Match item names EXACTLY to what's on the MENU. Handle common variations:
-   kaafi/coffee→Coffee, biriyani→Biryani, roti/chapati→Roti, naan→Naan, daal→Dal
-2. **STRICT MENU RULE**: If the customer asks for ANY item NOT explicitly listed in the MENU section above, you MUST put it in the `unavailable` array AND you MUST tell them in `response_text` that it is not available. Do NOT add it to `items`!
-3. Hindi number words: ek→1, do→2, teen→3, char→4, paanch→5, chhe→6, one→1, two→2, three→3
+1. Match item names to the MENU above. Use the STT TRANSCRIPT HANDLING section for common variations.
+2. If the customer asks for ANY item NOT on the MENU, put it in `unavailable` and tell them in `response_text`.
+3. Hindi number words: ek/एक→1, do/दो→2, teen/तीन→3, char/चार→4, paanch/पांच→5, chhe/छे→6
 4. Default quantity is 1 if not specified
 5. If customer says "aur" (more) or adds items, set action="modify_order" and include ONLY the NEW items
 6. If customer says "hatao"/"remove"/"cancel [item]", put those in remove_items
-7. If customer says "bas itna" / "that's all" / "confirm" / "done", set ready_to_confirm=true
-7. response_text MUST be in Hinglish, SHORT (max 2-3 sentences), and include total price
-8. If something is unclear, ask ONCE politely — don't keep repeating
-9. ALWAYS include total price when you have items
-10. If customer chats casually ("kaisa hai", "weather"), reply briefly and redirect to order
-11. For suggestion: only suggest ONCE, not repeatedly. Only suggest items FROM the menu"""
+7. If customer says "bas itna"/"that's all"/"confirm"/"done"/"kar do", set ready_to_confirm=true
+8. response_text MUST be in Hinglish, SHORT (max 2-3 sentences), and include total price
+9. If something is unclear, ask ONCE politely — don't keep repeating
+10. ALWAYS include total price when you have items
+11. For suggestion: only suggest ONCE, not repeatedly. Only suggest items FROM the menu
+12. If MUST-TRY SUGGESTIONS section is present, you MUST mention 1-2 items from it in your response_text naturally"""
 
 
 def build_confirm_prompt(restaurant_name: str) -> str:
@@ -543,23 +763,16 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                 await ws.send_json({"type": "state", "state": "processing"})
 
                 system_prompt = build_order_prompt(
-                    restaurant_name, menu_list, conversation_history, current_order
+                    restaurant_name, menu_list, conversation_history, current_order,
+                    menu_data=menu_data, suggestion_given=suggestion_given
                 )
 
                 llm_raw = await sarvam_llm(system_prompt, f'Customer just said: "{transcript}"')
-                print(f"[EVA] LLM raw: {llm_raw}")
+                print(f"[EVA] LLM raw ({len(llm_raw)} chars): {llm_raw[:300]}")
 
                 try:
                     import re
-                    # Strip reasoning tags first to avoid issues with JSON parsing
-                    cleaned = strip_think_tags(llm_raw)
-                    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
-                    # Robust JSON extraction: find first { and last }
-                    json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-                    if json_match:
-                        cleaned = json_match.group(0)
-                        
-                    data = json.loads(cleaned)
+                    data = _robust_json_parse(llm_raw)
 
                     action = data.get("action", "take_order")
                     new_items = data.get("items", [])
@@ -569,6 +782,8 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                     needs_more = data.get("needs_more_info", False)
                     ready_to_confirm = data.get("ready_to_confirm", False)
                     suggestion = data.get("suggestion", "")
+
+                    print(f"[EVA] Parsed: action={action}, items={new_items}, unavail={unavailable}")
 
                     # ── Process new items via fuzzy match ─────────────────
                     for item in new_items:
@@ -606,35 +821,69 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
 
                     # ── Decide response ───────────────────────────────────
                     if ready_to_confirm and current_order:
-                        # Customer said "bas" or "done" — ask for confirmation
                         total = sum(i["price"] * i["qty"] for i in current_order)
                         item_list = ", ".join(f"{i['qty']} {i['name']}" for i in current_order)
 
-                        if not response_text:
-                            response_text = (
-                                f"Ji bilkul! Aapka order hai: {item_list}. "
-                                f"Total hoga {int(total)} rupees. "
-                                f"Confirm kar doon?"
-                            )
-
-                        state = "confirming"
-                        conversation_history.append({"role": "bot", "text": response_text})
-                        await bot_speak(response_text, "confirming")
+                        # ── UPSELL INTERCEPT: Suggest must-try items BEFORE confirming ──
+                        if not suggestion_given:
+                            suggestion_given = True
+                            smart_suggs = _get_smart_suggestions(current_order, menu_data)
+                            if smart_suggs:
+                                sugg_names = " ya ".join(s["name"] for s in smart_suggs)
+                                sugg_reason = smart_suggs[0]["reason"]
+                                response_text = (
+                                    f"Aapka order abhi tak: {item_list}, total {int(total)} rupees. "
+                                    f"Lekin ek minute — humari must-try recommendation: "
+                                    f"{sugg_names}! {sugg_reason} "
+                                    f"Add karein ya seedha confirm karein?"
+                                )
+                                # Stay in LISTENING so customer can add or confirm
+                                conversation_history.append({"role": "bot", "text": response_text})
+                                await bot_speak(response_text, "listening")
+                            else:
+                                # No suggestions available, proceed to confirm
+                                if not response_text:
+                                    response_text = (
+                                        f"Ji bilkul! Aapka order hai: {item_list}. "
+                                        f"Total hoga {int(total)} rupees. "
+                                        f"Confirm kar doon?"
+                                    )
+                                state = "confirming"
+                                conversation_history.append({"role": "bot", "text": response_text})
+                                await bot_speak(response_text, "confirming")
+                        else:
+                            # Suggestions already given, proceed to confirm
+                            if not response_text:
+                                response_text = (
+                                    f"Ji bilkul! Aapka order hai: {item_list}. "
+                                    f"Total hoga {int(total)} rupees. "
+                                    f"Confirm kar doon?"
+                                )
+                            state = "confirming"
+                            conversation_history.append({"role": "bot", "text": response_text})
+                            await bot_speak(response_text, "confirming")
 
                     elif current_order and not needs_more:
                         total = sum(i["price"] * i["qty"] for i in current_order)
                         item_list = ", ".join(f"{i['qty']} {i['name']}" for i in current_order)
 
-                        # Add suggestion if not given yet
-                        suggestion_part = ""
-                        if suggestion and not suggestion_given:
+                        # Smart upselling: inject suggestion if not given yet
+                        if not suggestion_given:
                             suggestion_given = True
-                            suggestion_part = f" {suggestion} bhi try karenge?"
+                            smart_suggs = _get_smart_suggestions(current_order, menu_data)
+                            if smart_suggs and not response_text:
+                                sugg_names = " ya ".join(s["name"] for s in smart_suggs)
+                                sugg_reason = smart_suggs[0]["reason"]
+                                response_text = (
+                                    f"Ji zaroor! {item_list}, total {int(total)} rupees. "
+                                    f"Aur ek must-try recommendation — {sugg_names} bhi try karenge? "
+                                    f"{sugg_reason} "
+                                    f"Ya confirm kar doon?"
+                                )
 
                         if not response_text:
                             response_text = (
-                                f"Ji zaroor! {item_list}, total {int(total)} rupees."
-                                f"{suggestion_part} "
+                                f"Ji zaroor! {item_list}, total {int(total)} rupees. "
                                 f"Aur kuch chahiye ya confirm karein?"
                             )
 
@@ -658,11 +907,14 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                         await bot_speak(response_text, "listening")
 
                 except (json.JSONDecodeError, KeyError, ValueError) as e:
-                    print(f"[EVA] Parse error: {e}")
-                    await bot_speak(
-                        "Sorry ji, main samajh nahi paayi. Ek baar phir bataiye kya chahiye?",
-                        "listening"
+                    print(f"[EVA] ❌ JSON Parse error: {e}")
+                    print(f"[EVA] ❌ Raw LLM was: {llm_raw[:500]}")
+                    # Echo back what was heard so customer knows we're trying
+                    fallback_msg = (
+                        f"Sorry ji, aapne '{transcript[:60]}' bola — "
+                        f"main thoda confuse ho gayi. Ek baar phir bataiye kya chahiye?"
                     )
+                    await bot_speak(fallback_msg, "listening")
 
             # ── STATE: CONFIRMING — Check yes/no ─────────────────────────
             elif state == "confirming":
@@ -671,15 +923,7 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                 print(f"[EVA] Confirm LLM: {confirm_raw}")
 
                 try:
-                    import re
-                    # Strip reasoning tags first
-                    cleaned = strip_think_tags(confirm_raw)
-                    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
-                    json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-                    if json_match:
-                        cleaned = json_match.group(0)
-                        
-                    result = json.loads(cleaned)
+                    result = _robust_json_parse(confirm_raw)
                     confirmed = result.get("confirmed", False)
                     wants_changes = result.get("wants_changes", False)
                     wants_to_add = result.get("wants_to_add", False)
@@ -721,7 +965,7 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
             # ── STATE: ASKING_NAME — Extract customer name ────────────────
             elif state == "asking_name":
                 # The transcript IS the customer's name (or contains it)
-                # Use LLM to cleanly extract just the name
+                # Use LLM to cleanly extract just the name — with resilient fallback
                 name_prompt = (
                     "You are a name extractor. The customer just told their name on a phone call. "
                     "Extract ONLY the person's name from what they said. "
@@ -729,10 +973,15 @@ async def voice_bot_call(ws: WebSocket, table_id: str = Query("T1")):
                     "Respond with ONLY the name in plain text, nothing else. No JSON, no quotes, no explanation. "
                     "If you can't find a name, respond with 'Customer'."
                 )
-                customer_name = await sarvam_llm(name_prompt, f'Customer said: "{transcript}"')
-                customer_name = strip_think_tags(customer_name).strip().strip('"').strip("'").strip()
-                if not customer_name or len(customer_name) > 50:
-                    customer_name = "Customer"
+                try:
+                    customer_name = await sarvam_llm(name_prompt, f'Customer said: "{transcript}"')
+                    customer_name = strip_think_tags(customer_name).strip().strip('"').strip("'").strip()
+                    # Remove any common noise from STT
+                    noise = {"customer", "ji", "haan", "yes", "ok", "okay", "hello", "hi", ""}
+                    if not customer_name or len(customer_name) > 50 or customer_name.lower() in noise:
+                        customer_name = f"Table {table_id}"
+                except Exception:
+                    customer_name = f"Table {table_id}"
                 
                 print(f"[EVA] 👤 Customer name: {customer_name}")
 

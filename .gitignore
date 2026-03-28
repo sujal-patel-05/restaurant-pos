@@ -41,3 +41,7 @@ Thumbs.db
 backend/restaurant_pos.db
 backend/test_db.sqlite
 *.log
+backend/static/invoices/
+backend/temp_audio/
+backend/ml_models/
+frontend/vite.config.js.timestamp-*

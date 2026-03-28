@@ -23,7 +23,7 @@ function ChatMessage({ message }) {
     const renderChart = () => {
         if (!message.chartData) return null;
         const { data, type, title, xKey, yKey } = message.chartData;
-        if (!data || data.length === 0) return null;
+        if (!data || data.length <= 1) return null;
 
         const chartXKey = xKey || 'label';
         const chartYKey = yKey || 'value';
