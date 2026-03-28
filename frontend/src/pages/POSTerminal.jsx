@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { menuAPI, ordersAPI, billingAPI } from '../services/api';
+import { menuAPI, ordersAPI, billingAPI, API_BASE_URL } from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { Utensils } from 'lucide-react';
@@ -63,7 +63,7 @@ function POSTerminal() {
     };
 
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const backendBaseUrl = `http://${window.location.hostname}:8000`;
+    const backendBaseUrl = API_BASE_URL;
 
     const placeOrder = async () => {
         if (cart.length === 0) {

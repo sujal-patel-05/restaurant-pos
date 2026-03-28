@@ -162,4 +162,5 @@ export const revenueIntelligenceAPI = {
     getPriceRecommendations: (days = 30) => api.get('/api/revenue-intelligence/price-recommendations', { params: { days } }),
 };
 
+export { API_BASE_URL };
 export default api;

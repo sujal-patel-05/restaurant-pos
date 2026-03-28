@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { menuAPI, inventoryAPI } from '../services/api';
+import { menuAPI, inventoryAPI, API_BASE_URL } from '../services/api';
 import { Modal } from '../components/Modal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
@@ -125,7 +125,7 @@ function MenuManagement() {
             })) : []
         });
         setImageFile(null);
-        setImagePreview(item.image_url ? `http://localhost:8000${item.image_url}` : null);
+        setImagePreview(item.image_url ? `${API_BASE_URL}${item.image_url}` : null);
         setShowItemModal(true);
     };
 
@@ -148,7 +148,7 @@ function MenuManagement() {
         formData.append('file', imageFile);
 
         try {
-            await fetch(`http://localhost:8000/api/menu/items/${itemId}/image`, {
+            await fetch(`${API_BASE_URL}/api/menu/items/${itemId}/image`, {
                 method: 'POST',
                 body: formData,
             });
@@ -360,7 +360,7 @@ function MenuManagement() {
                                             height: '150px'
                                         }}>
                                             <img
-                                                src={`http://localhost:8000${item.image_url}`}
+                                                src={`${API_BASE_URL}${item.image_url}`}
                                                 alt={item.name}
                                                 style={{
                                                     width: '100%',
