@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.svg', 'icons/icon-512.svg'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+      },
       manifest: {
         name: 'SujalPOS - Restaurant POS',
         short_name: 'SujalPOS',
