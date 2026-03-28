@@ -51,7 +51,12 @@ app.include_router(kds.router)
 app.include_router(billing.router)
 app.include_router(reports.router)
 app.include_router(ai.router)
-app.include_router(agents_route.router)
+
+# Optional Agents Route
+try:
+    app.include_router(agents_route.router)
+except Exception as e:
+    print(f"[WARN] Agents route disabled: {e}")
 app.include_router(customer_router)
 app.include_router(table_admin_router)
 app.include_router(call_orders_router)
