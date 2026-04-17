@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, ComposedChart, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { AppLayout } from '../components/AppLayout';
@@ -106,6 +106,7 @@ function Dashboard() {
                         series: [...hist.slice(-14), ...fore],  // last 14 days + 7 forecast
                         model: forecastRes.data.model,
                         r_squared: forecastRes.data.r_squared,
+                        mape: forecastRes.data.mape,
                         trend: forecastRes.data.trend,
                         avg_daily: forecastRes.data.avg_daily_revenue
                     });
@@ -412,25 +413,25 @@ function Dashboard() {
                                     </div>
                                     <div>
                                         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
-                                            ML Sales Forecast
+                                            AI Revenue Projection
                                         </h2>
                                         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                            Polynomial regression on 30-day history
+                                            Facebook Prophet Bayesian Time-Series Model
                                         </p>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    {forecastData.r_squared != null && (
+                                    {forecastData.mape != null && (
                                         <span style={{
                                             padding: '4px 10px', borderRadius: 8,
                                             fontSize: 11, fontWeight: 700,
-                                            background: forecastData.r_squared > 0.7
+                                            background: forecastData.mape < 20
                                                 ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)',
-                                            color: forecastData.r_squared > 0.7 ? '#22c55e' : '#f59e0b',
-                                            border: `1px solid ${forecastData.r_squared > 0.7
+                                            color: forecastData.mape < 20 ? '#22c55e' : '#f59e0b',
+                                            border: `1px solid ${forecastData.mape < 20
                                                 ? 'rgba(34,197,94,.2)' : 'rgba(245,158,11,.2)'}`
                                         }}>
-                                            R² = {forecastData.r_squared}
+                                            MAPE = {forecastData.mape}%
                                         </span>
                                     )}
                                     {forecastData.trend && (
@@ -462,24 +463,32 @@ function Dashboard() {
                                 </div>
                             </div>
                             <ResponsiveContainer width="100%" height={340}>
-                                <LineChart data={forecastData.series}>
+                                <ComposedChart data={forecastData.series}>
                                     <defs>
                                         <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
                                             <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
                                         </linearGradient>
+                                        <linearGradient id="confidenceGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.15} />
+                                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0.05} />
+                                        </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                                     <XAxis
                                         dataKey="date"
                                         stroke="var(--text-secondary)"
                                         tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
                                         tickFormatter={(v) => new Date(v).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                                        axisLine={false}
+                                        tickLine={false}
                                     />
                                     <YAxis
                                         stroke="var(--text-secondary)"
                                         tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
                                         tickFormatter={(v) => `₹${v.toLocaleString()}`}
+                                        axisLine={false}
+                                        tickLine={false}
                                     />
                                     <Tooltip
                                         contentStyle={{
@@ -487,30 +496,59 @@ function Dashboard() {
                                             border: '1px solid var(--border-color)',
                                             borderRadius: '10px',
                                             color: 'var(--text-main)',
-                                            fontSize: 12
+                                            fontSize: 12,
+                                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
                                         }}
                                         formatter={(value, name) => {
                                             if (value == null) return [null, null];
-                                            const label = name === 'revenue' ? 'Actual'
-                                                : name === 'forecast' ? 'Predicted'
-                                                    : name === 'upper' ? 'Upper Bound'
-                                                        : 'Lower Bound';
+                                            const label = name === 'revenue' ? 'Actual Revenue'
+                                                : name === 'forecast' ? 'ML Projection'
+                                                    : name === 'confidence' ? '80% Confidence Zone'
+                                                        : name;
                                             return [`₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, label];
                                         }}
-                                        labelFormatter={(l) => new Date(l).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                        labelFormatter={(l) => new Date(l).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
                                     />
                                     <Legend
-                                        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                                        formatter={(v) => v === 'revenue' ? 'Historical' : v === 'forecast' ? 'ML Forecast' : v === 'upper' ? 'Upper Bound' : 'Lower Bound'}
+                                        wrapperStyle={{ fontSize: 12, paddingTop: 15 }}
+                                        verticalAlign="bottom"
+                                        formatter={(v) => v === 'revenue' ? 'Historical Sales' : v === 'forecast' ? 'Prophet Forecast' : v === 'confidence' ? 'Confidence Interval' : v}
                                     />
-                                    {/* Confidence bounds */}
-                                    <Line type="monotone" dataKey="upper" stroke="#8b5cf680" strokeWidth={1} strokeDasharray="4 4" dot={false} connectNulls={false} />
-                                    <Line type="monotone" dataKey="lower" stroke="#8b5cf680" strokeWidth={1} strokeDasharray="4 4" dot={false} connectNulls={false} />
-                                    {/* Historical */}
-                                    <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1' }} connectNulls={false} />
-                                    {/* Forecast */}
-                                    <Line type="monotone" dataKey="forecast" stroke="#a855f7" strokeWidth={2.5} strokeDasharray="8 4" dot={{ r: 4, fill: '#a855f7', strokeWidth: 2, stroke: '#fff' }} connectNulls={false} />
-                                </LineChart>
+                                    
+                                    {/* Confidence Range Area */}
+                                    <Area
+                                        type="monotone"
+                                        dataKey={(d) => d.forecast ? [d.lower || 0, d.upper || 0] : null}
+                                        name="confidence"
+                                        stroke="none"
+                                        fill="url(#confidenceGrad)"
+                                        fillOpacity={1}
+                                        connectNulls={false}
+                                    />
+
+                                    {/* Historical Line */}
+                                    <Line
+                                        type="monotone"
+                                        dataKey="revenue"
+                                        stroke="#6366f1"
+                                        strokeWidth={3}
+                                        dot={{ r: 4, fill: '#6366f1', strokeWidth: 0 }}
+                                        activeDot={{ r: 6, strokeWidth: 0 }}
+                                        connectNulls={false}
+                                    />
+
+                                    {/* Forecast Line */}
+                                    <Line
+                                        type="monotone"
+                                        dataKey="forecast"
+                                        stroke="#a855f7"
+                                        strokeWidth={3}
+                                        strokeDasharray="5 5"
+                                        dot={{ r: 4, fill: '#fff', strokeWidth: 2, stroke: '#a855f7' }}
+                                        activeDot={{ r: 6, stroke: '#a855f7', strokeWidth: 2, fill: '#fff' }}
+                                        connectNulls={false}
+                                    />
+                                </ComposedChart>
                             </ResponsiveContainer>
                         </div>
                     )}

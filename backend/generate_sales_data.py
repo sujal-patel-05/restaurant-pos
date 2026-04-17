@@ -111,6 +111,12 @@ CUSTOMER_LAST = [
 
 TABLE_NUMBERS = [f"T{i}" for i in range(1, 16)]
 
+SPECIAL_INSTRUCTIONS_ONLINE = [
+    "Extra spicy please", "No onions", "Jain prep if possible", 
+    "Please send cutlery", "Ring bell, do not knock", 
+    "Keep it crispy", "Less ice in drinks", "Extra ketchup"
+]
+
 # ── HELPERS ─────────────────────────────────────────────────────
 
 def weighted_choice(options):
@@ -145,9 +151,10 @@ def generate():
     db = SessionLocal()
 
     # Fetch restaurant + menu
-    restaurant = db.query(Restaurant).first()
+    restaurants = db.query(Restaurant).all()
+    restaurant = next((r for r in restaurants if db.query(MenuItem).filter(MenuItem.restaurant_id == str(r.id)).count() > 0), None)
     if not restaurant:
-        print("❌ No restaurant found. Seed one first.")
+        print("❌ No restaurant found with menu items. Seed one first.")
         return
     rid = str(restaurant.id)
 
@@ -162,14 +169,22 @@ def generate():
     # Delete old synthetic orders (orders in the past, not today)
     today = date.today()
     cutoff = datetime.combine(today, datetime.min.time())
-    old_orders = db.query(Order).filter(
+    
+    order_ids = db.query(Order.id).filter(
         Order.restaurant_id == rid,
         Order.created_at < cutoff
     ).all()
-    if old_orders:
-        print(f"🗑️  Removing {len(old_orders)} existing past orders...")
-        for o in old_orders:
-            db.delete(o)
+    
+    if order_ids:
+        ids_list = [row[0] for row in order_ids]
+        print(f"🗑️  Removing {len(ids_list)} existing past orders...")
+        # Chunking to avoid sqlite IN clause limit
+        for i in range(0, len(ids_list), 500):
+            chunk = ids_list[i:i+500]
+            db.query(Payment).filter(Payment.order_id.in_(chunk)).delete(synchronize_session=False)
+            db.query(KOT).filter(KOT.order_id.in_(chunk)).delete(synchronize_session=False)
+            db.query(OrderItem).filter(OrderItem.order_id.in_(chunk)).delete(synchronize_session=False)
+            db.query(Order).filter(Order.id.in_(chunk)).delete(synchronize_session=False)
         db.commit()
 
     order_counter = 0
@@ -218,10 +233,10 @@ def generate():
                 order_type = weighted_choice(ORDER_TYPES)
 
             # Customer
-            cust_name = f"{random.choice(CUSTOMER_FIRST)} {random.choice(CUSTOMER_LAST)}"
-            special_instructions = random.choice(SPECIAL_INSTRUCTIONS_ONLINE) if random.random() < 0.3 else f"[Eva Voice Order] Table {table_id}"
-            cust_phone = random_phone() if random.random() < 0.6 else None
             table_num = random.choice(TABLE_NUMBERS) if order_type == OrderType.DINE_IN else None
+            cust_name = f"{random.choice(CUSTOMER_FIRST)} {random.choice(CUSTOMER_LAST)}"
+            special_instructions = random.choice(SPECIAL_INSTRUCTIONS_ONLINE) if random.random() < 0.3 else (f"[Eva Voice Order] Table {table_num}" if table_num else "")
+            cust_phone = random_phone() if random.random() < 0.6 else None
 
             # Platform order ID for online orders
             platform_id = None
@@ -276,7 +291,7 @@ def generate():
             order = Order(
                 id=order_id,
                 restaurant_id=rid,
-                order_number=f"ORD-{current_date.strftime('%Y%m%d')}-{i+1:04d}",
+                order_number=f"ORD-{current_date.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}-{i+1:04d}",
                 order_type=order_type,
                 order_source=order_source,
                 status=status,

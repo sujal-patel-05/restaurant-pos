@@ -58,6 +58,21 @@ Chart types: `bar`, `line`, `pie`
 5. **Wastage Tracking** — waste logs, reasons, cost impact
 6. **Business Insights (Revenue Intelligence)** — actionable recommendations on margins, profitability, popularity (BCG Matrix), combo deals, upselling, and price optimization.
 7. **Menu Optimization** — identifying "Hidden Gems" (high margin, low sales) or "Workhorses" (high sales, low margin).
+8. **Menu Management** — change item prices, add new items, remove items, toggle availability — all in real-time.
+9. **Batch Operations** — execute MULTIPLE menu/order operations in a single command (e.g., "Add paneer wrap at 220, change burger to 300, and remove cold coffee").
+10. **Report Generation** — generate comprehensive, detailed sales reports (daily/weekly/monthly/quarterly) with KPIs, charts, insights, and downloadable PDF. Reports include revenue trends, top items, category breakdown, payment modes, peak hours, day-of-week analysis, and period-over-period comparisons.
+
+## Menu Management — Smart Follow-up Rules (CRITICAL)
+- When a user asks to **update/change a price** without specifying the new price, FIRST show the current price from the Retrieved Data, then ask what they'd like the new price to be.
+- When a user asks to **add a new item** without full details, ask for: item name, price, category, description, and prep time.
+- When a user asks to **delete/remove an item**, always confirm with the user before proceeding. Show the item name and price.
+- When responding to **follow-up messages** (like "make it 150", "yes", "confirm"), use the conversation history to understand context and complete the pending action.
+- After a successful menu change, always show the **before and after** values clearly.
+
+## Multi-Operation Results
+- When the system returns `multi_operation: true`, format each operation's result clearly with numbered steps.
+- Show ✅ for successes, ❌ for failures, ⚠️ for skipped operations.
+- Summarize at the end: "X/Y operations completed successfully."
 
 ## Error Handling
 - If no data is returned, explain nicely: "I couldn't find any [X] for [period]. This could mean no [activity] has been recorded yet."
@@ -82,7 +97,24 @@ INTENT_CLASSIFICATION_PROMPT = """Classify this restaurant POS message into exac
 | `menu_info` | Item prices, availability, menu details | "How much is the pizza?" |
 | `wastage_query` | Waste logs, spoilage, food waste | "What was wasted this week?" |
 | `revenue_intel` | Margins, profit contribution, popular items (BCG), combo deals, pricing advice, under-promoted items | "Which items have the highest margin?", "Give me combo suggestions", "What are our hidden gems?" |
+| `generate_report` | Generate/download/create/export comprehensive sales reports (daily, weekly, monthly, quarterly) with KPIs, charts, and PDF | "Generate monthly sales report", "Download weekly report", "Create a sales report" |
+| `update_menu_item` | Change item price, toggle availability, modify item details | "Change burger price to 250", "Update price of dosa", "Make pizza unavailable" |
+| `add_menu_item` | Add new items/dishes to the restaurant menu | "Add paneer tikka at 280 in starters", "Add new item to menu" |
+| `delete_menu_item` | Remove/disable items from the menu | "Remove cold coffee from menu", "Delete samosa" |
+| `multi_operation` | MULTIPLE operations in ONE message (add + update + delete combined) | "Add paneer wrap at 220, change burger to 300, and remove cold coffee" |
 | `general` | Greetings, capabilities, off-topic | "Hi", "What can you do?" |
+
+## CRITICAL: Report vs Sales Query Distinction
+- `generate_report` = user wants a REPORT (PDF, download, export, generate, create report, comprehensive analytics)
+- `sales_query` = user is ASKING about sales data (how much, how many, today's total)
+- Keywords for `generate_report`: "report", "generate", "download", "create report", "export", "PDF", "print report"
+
+## CRITICAL: Multi-Operation Detection
+- If the message contains TWO or MORE distinct menu/order operations, classify as `multi_operation`
+- Indicators: conjunctions ("and", "also", "then"), commas separating distinct actions, semicolons
+- Example: "Add paneer wrap at 220 and change burger price to 300" → multi_operation
+- Example: "Remove cold coffee, add mango lassi at 120, and update pizza price to 400" → multi_operation
+- Single operations like "Add paneer wrap at 220 in starters" → add_menu_item (NOT multi_operation)
 
 ## Few-Shot Examples
 User: "What are today's sales?" → {{"intent_type":"sales_query","confidence":0.97,"entities":{{"period":"today","days":1}},"needs_data":true}}
@@ -101,6 +133,26 @@ User: "What are our most profitable items?" → {{"intent_type":"revenue_intel",
 User: "Show me combo recommendations" → {{"intent_type":"revenue_intel","confidence":0.97,"entities":{{"query_sub_type":"combos"}},"needs_data":true}}
 User: "Which items have low margins but high volume?" → {{"intent_type":"revenue_intel","confidence":0.95,"entities":{{"query_sub_type":"velocity"}},"needs_data":true}}
 User: "Give me a full revenue intelligence report" → {{"intent_type":"revenue_intel","confidence":0.99,"entities":{{"query_sub_type":"full_report"}},"needs_data":true}}
+User: "Generate monthly sales report" → {{"intent_type":"generate_report","confidence":0.98,"entities":{{"report_type":"monthly","days":30}},"needs_data":true}}
+User: "Download weekly report" → {{"intent_type":"generate_report","confidence":0.97,"entities":{{"report_type":"weekly","days":7}},"needs_data":true}}
+User: "Create a daily sales report" → {{"intent_type":"generate_report","confidence":0.97,"entities":{{"report_type":"daily","days":1}},"needs_data":true}}
+User: "I need a sales report for this month" → {{"intent_type":"generate_report","confidence":0.96,"entities":{{"report_type":"monthly","days":30}},"needs_data":true}}
+User: "Export quarterly report with charts" → {{"intent_type":"generate_report","confidence":0.97,"entities":{{"report_type":"quarterly","days":90}},"needs_data":true}}
+User: "Report banao aaj ka" → {{"intent_type":"generate_report","confidence":0.95,"entities":{{"report_type":"daily","days":1}},"needs_data":true}}
+User: "Give me detailed analytics report for last 14 days" → {{"intent_type":"generate_report","confidence":0.96,"entities":{{"report_type":"custom","days":14}},"needs_data":true}}
+User: "Change burger price to 300" → {{"intent_type":"update_menu_item","confidence":0.98,"entities":{{"item_name":"burger","new_price":300}},"needs_data":true}}
+User: "Update price of dosa" → {{"intent_type":"update_menu_item","confidence":0.96,"entities":{{"item_name":"dosa"}},"needs_data":true}}
+User: "Make pizza unavailable" → {{"intent_type":"update_menu_item","confidence":0.97,"entities":{{"item_name":"pizza","availability":false}},"needs_data":true}}
+User: "Add paneer tikka at 280 in starters" → {{"intent_type":"add_menu_item","confidence":0.97,"entities":{{"item_name":"paneer tikka","price":280,"category":"starters"}},"needs_data":true}}
+User: "Add a new item to the menu" → {{"intent_type":"add_menu_item","confidence":0.95,"entities":{{}},"needs_data":true}}
+User: "Add grilled sandwich at 180, a crispy grilled cheese sandwich, takes 10 minutes" → {{"intent_type":"add_menu_item","confidence":0.97,"entities":{{"item_name":"grilled sandwich","price":180,"description":"a crispy grilled cheese sandwich","preparation_time":10}},"needs_data":true}}
+User: "Remove cold coffee from menu" → {{"intent_type":"delete_menu_item","confidence":0.97,"entities":{{"item_name":"cold coffee"}},"needs_data":true}}
+User: "Delete samosa" → {{"intent_type":"delete_menu_item","confidence":0.96,"entities":{{"item_name":"samosa"}},"needs_data":true}}
+User: "Burger ki price 250 karo" → {{"intent_type":"update_menu_item","confidence":0.95,"entities":{{"item_name":"burger","new_price":250}},"needs_data":true}}
+User: "Dosa ka price badha do" → {{"intent_type":"update_menu_item","confidence":0.94,"entities":{{"item_name":"dosa"}},"needs_data":true}}
+User: "Add paneer wrap at 220, change burger to 300, and remove cold coffee" → {{"intent_type":"multi_operation","confidence":0.98,"entities":{{}},"needs_data":true}}
+User: "Add mango lassi at 120 in beverages and update pizza price to 400" → {{"intent_type":"multi_operation","confidence":0.97,"entities":{{}},"needs_data":true}}
+User: "Remove samosa and add spring rolls at 150" → {{"intent_type":"multi_operation","confidence":0.96,"entities":{{}},"needs_data":true}}
 
 ## Time Period Extraction Rules
 - "today" → period: "today", days: 1
@@ -249,6 +301,90 @@ Now respond to the user's message using the retrieved data above. Remember:
         except Exception as e:
             logger.error(f"Groq response generation error: {e}")
             return "I encountered an error generating a response. Please try again in a moment."
+
+
+    def decompose_multi_operation(self, message: str) -> Optional[list]:
+        """
+        Use Groq LLM to decompose a compound message into individual operations.
+        
+        Input:  "Add paneer wrap at 220, change burger to 300, and remove cold coffee"
+        Output: [
+            {"intent_type": "add_menu_item", "entities": {"item_name": "paneer wrap", "price": 220}, "original_text": "Add paneer wrap at 220"},
+            {"intent_type": "update_menu_item", "entities": {"item_name": "burger", "new_price": 300}, "original_text": "change burger to 300"},
+            {"intent_type": "delete_menu_item", "entities": {"item_name": "cold coffee"}, "original_text": "remove cold coffee"}
+        ]
+        """
+        if not self.client:
+            return None
+        
+        decompose_prompt = f"""Decompose this compound restaurant POS command into individual operations.
+
+Each operation must be one of:
+- `add_menu_item` — entities: item_name, price, category (optional), description (optional), preparation_time (optional)
+- `update_menu_item` — entities: item_name, new_price (optional), availability (optional: true/false)
+- `delete_menu_item` — entities: item_name
+- `create_order` — entities: items (list of {{name, quantity}}), table_number, order_type
+
+Return a JSON object with a single key "operations" containing an array. Each operation has:
+- "intent_type": the intent string
+- "entities": extracted entities for that operation
+- "original_text": the portion of the original message for this operation
+
+## Examples
+Input: "Add paneer wrap at 220 in starters and change burger price to 300"
+Output: {{"operations": [
+  {{"intent_type": "add_menu_item", "entities": {{"item_name": "paneer wrap", "price": 220, "category": "starters"}}, "original_text": "Add paneer wrap at 220 in starters"}},
+  {{"intent_type": "update_menu_item", "entities": {{"item_name": "burger", "new_price": 300}}, "original_text": "change burger price to 300"}}
+]}}
+
+Input: "Remove samosa, add spring rolls at 150 in appetizers, and make pizza unavailable"
+Output: {{"operations": [
+  {{"intent_type": "delete_menu_item", "entities": {{"item_name": "samosa"}}, "original_text": "Remove samosa"}},
+  {{"intent_type": "add_menu_item", "entities": {{"item_name": "spring rolls", "price": 150, "category": "appetizers"}}, "original_text": "add spring rolls at 150 in appetizers"}},
+  {{"intent_type": "update_menu_item", "entities": {{"item_name": "pizza", "availability": false}}, "original_text": "make pizza unavailable"}}
+]}}
+
+## User Message: "{message}"
+
+Output ONLY valid JSON. No explanation."""
+        
+        try:
+            response = self.client.chat.completions.create(
+                messages=[
+                    {'role': 'system', 'content': 'You are a precise JSON-only operation decomposer for a restaurant POS system. Output ONLY valid JSON, nothing else.'},
+                    {'role': 'user', 'content': decompose_prompt}
+                ],
+                model=self.model_name,
+                temperature=0.05,
+                max_tokens=800,
+                response_format={"type": "json_object"}
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            result = json.loads(result_text)
+            
+            operations = result.get('operations', [])
+            if not operations:
+                logger.warning("LLM decomposition returned no operations")
+                return None
+            
+            # Validate each operation has required fields
+            validated = []
+            for op in operations:
+                if 'intent_type' in op and 'entities' in op:
+                    if 'original_text' not in op:
+                        op['original_text'] = f"Operation: {op['intent_type']}"
+                    validated.append(op)
+            
+            logger.info(f"LLM decomposed '{message[:50]}...' into {len(validated)} operations")
+            return validated if validated else None
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Groq multi-op decomposition returned invalid JSON: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Groq multi-op decomposition error: {e}")
+            return None
 
 
 # Singleton instance

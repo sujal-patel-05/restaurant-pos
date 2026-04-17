@@ -66,10 +66,15 @@ async def sarvam_stt(audio_path: str, menu_hint: str = "") -> str:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 with open(audio_path, "rb") as f:
+                    # Sarvam AI Saaras v3 supports 23 languages with auto-detect:
+                    # Hindi, Bengali, Gujarati, Kannada, Malayalam, Marathi, Odia,
+                    # Punjabi, Tamil, Telugu, Assamese, Bodo, Dogri, Kashmiri,
+                    # Konkani, Maithili, Manipuri, Nepali, Sanskrit, Santali,
+                    # Sindhi, Urdu, and English.
                     form_data = {
-                        "language_code": "hi-IN",
+                        "language_code": "unknown",     # Auto-detect any of 23 supported languages
                         "model": "saaras:v3",
-                        "with_disfluencies": "false",  # Remove ums/ahs for cleaner text
+                        "with_disfluencies": "false",   # Remove ums/ahs for cleaner text
                     }
                     resp = await client.post(
                         "https://api.sarvam.ai/speech-to-text",

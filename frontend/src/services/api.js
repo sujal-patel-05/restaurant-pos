@@ -129,6 +129,7 @@ export const reportsAPI = {
     getDashboardStats: () => api.get('/api/reports/dashboard-stats'),
     getDashboardCharts: () => api.get('/api/reports/dashboard-charts'),
     getSalesForecast: (days = 30, forecastDays = 7) => api.get('/api/reports/sales-forecast', { params: { days, forecast_days: forecastDays } }),
+    getForecastBenchmark: () => api.get('/api/reports/forecast-benchmark'),
     getDailyRevenueTrend: (days = 30) => api.get('/api/reports/daily-revenue-trend', { params: { days } }),
     getCategorySales: (days = 7) => api.get('/api/reports/category-sales', { params: { days } }),
     getPaymentMethods: (days = 7) => api.get('/api/reports/payment-methods', { params: { days } }),

@@ -21,3 +21,6 @@ email-validator
 numpy==1.26.4
 scikit-learn==1.4.0
 bcrypt==3.2.0
+prophet
+pandas
+statsmodels

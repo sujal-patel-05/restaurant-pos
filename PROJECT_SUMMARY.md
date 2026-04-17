@@ -195,32 +195,56 @@ This makes the system **robust and deterministic**.
 
 ---
 
-### 3.3 ML-Powered Sales Forecasting
+### 3.3 ML-Powered Sales Forecasting (Facebook Prophet)
 
-**Purpose:** Predict future revenue trends using historical sales data.
+**Purpose:** Predict future revenue trends using historical sales data with production-grade time-series decomposition.
 
-**Algorithm:** Polynomial Regression (Degree-2) using NumPy
+**Primary Model:** Facebook Prophet (Meta Open Source)  
+**Fallback:** Polynomial Regression (Degree-2) via NumPy
 
 ```python
 # Actual implementation in report_service.py
-coefficients = np.polyfit(x_values, y_revenue, deg=2)
-polynomial = np.poly1d(coefficients)
-forecast = polynomial(future_x_values)
+from prophet import Prophet
+import pandas as pd
+
+df = pd.DataFrame({"ds": dates, "y": daily_revenues})
+model = Prophet(
+    weekly_seasonality=True,           # Captures weekday vs weekend patterns
+    seasonality_mode='multiplicative', # Revenue scales on busy days
+    changepoint_prior_scale=0.05,      # Conservative trend flexibility
+    interval_width=0.80,               # 80% Bayesian confidence interval
+)
+model.fit(df)
+future = model.make_future_dataframe(periods=7)
+forecast = model.predict(future)
 ```
+
+**Prophet Model Equation:**  
+`y(t) = g(t) + s(t) + h(t) + ε`
+
+| Component | Description |
+|-----------|-------------|
+| `g(t)` | Piecewise linear trend (growth/decline detection) |
+| `s(t)` | Weekly Fourier seasonality (weekday vs weekend patterns) |
+| `h(t)` | Holiday effects (Indian holidays via `holidays` library) |
+| `ε` | Irreducible noise |
 
 | Parameter | Value |
 |-----------|-------|
-| Training Data | 30-90 days of daily revenue |
-| Model | Quadratic polynomial (y = ax² + bx + c) |
+| Training Data | 30–90 days of daily revenue |
+| Model | Prophet (additive/multiplicative time-series decomposition) |
 | Forecast Horizon | 7 days |
-| Output | Predicted daily revenue + confidence metrics (R², MAE) |
-| Visualization | Interactive chart with actual vs predicted lines |
+| Output | Predicted daily revenue + 80% Bayesian confidence intervals + weekly seasonality insights |
+| Visualization | Interactive chart with actual vs predicted lines + confidence band |
 
-**Why Polynomial Regression?**
-- Restaurant revenue follows cyclical patterns (weekday/weekend)
-- Captures non-linear growth trends
-- Lightweight — no ML framework dependencies (just NumPy)
-- Interpretable coefficients for academic analysis
+**Why Facebook Prophet over Polynomial Regression?**
+- **Weekly seasonality** — automatically detects weekday vs weekend revenue patterns (e.g., Sunday = best day, Tuesday = worst)
+- **Trend decomposition** — separates growth trend from cyclical patterns
+- **Bayesian confidence intervals** — provides upper/lower bounds for each forecast, not just point estimates
+- **Robust to missing data** — handles gaps in historical data gracefully
+- **Industry standard** — used by Meta, Uber, and major enterprises for demand forecasting
+- **Automatic changepoint detection** — identifies when revenue trends shift
+- Polynomial regression retained as automatic fallback if Prophet is unavailable
 
 ---
 

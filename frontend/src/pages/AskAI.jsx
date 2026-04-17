@@ -19,7 +19,9 @@ import {
     PanelLeftOpen,
     Plus,
     Clock,
-    X
+    X,
+    Settings,
+    FileBarChart
 } from 'lucide-react';
 
 function AskAI() {
@@ -120,6 +122,7 @@ function AskAI() {
                 role: 'assistant',
                 content: response.data.message,
                 chartData: response.data.chart_data,
+                data: response.data.data,
                 intent: response.data.intent?.intent_type,
                 timestamp: new Date(response.data.timestamp)
             }]);
@@ -153,20 +156,20 @@ function AskAI() {
 
     const featureCards = [
         { icon: <TrendingUp size={20} />, title: 'Sales Analytics', desc: 'Revenue, trends, peak hours', q: "What are today's total sales?", color: '#6366f1' },
+        { icon: <FileBarChart size={20} />, title: 'Sales Reports', desc: 'Detailed reports with PDF export', q: 'Generate monthly sales report', color: '#06b6d4' },
         { icon: <Package size={20} />, title: 'Inventory Status', desc: 'Stock levels, low alerts', q: 'Which items are running low in stock?', color: '#f59e0b' },
         { icon: <ShoppingCart size={20} />, title: 'Order Tracking', desc: 'Status, history, details', q: 'Show me all pending orders', color: '#10b981' },
         { icon: <UtensilsCrossed size={20} />, title: 'Menu Intelligence', desc: 'Prices, availability, popular', q: "What's on the menu with prices?", color: '#ec4899' },
-        { icon: <Trash2 size={20} />, title: 'Wastage Report', desc: 'Food waste, cost impact', q: 'What was the wastage this week?', color: '#ef4444' },
         { icon: <Sparkles size={20} />, title: 'Smart Insights', desc: 'AI-powered recommendations', q: 'Give me a business summary for this week', color: '#8b5cf6' },
     ];
 
     const contextChips = [
+        "Generate weekly sales report",
         "What's our average order value?",
-        "Show top 5 selling items",
-        "Revenue comparison: today vs yesterday",
+        "Add paneer wrap at 220 and change burger to 300",
+        "Change pizza price to 400",
+        "Create daily report with charts",
         "Any items expiring soon?",
-        "What's the busiest hour today?",
-        "Total orders this week",
     ];
 
     const isEmptyChat = messages.length === 0;
@@ -187,7 +190,7 @@ function AskAI() {
     };
 
     return (
-        <AppLayout title="Ask AI" subtitle="Your intelligent POS co-pilot">
+        <AppLayout title="5ive AI" subtitle="Your intelligent POS co-pilot">
             <style>{`
                 .aai-layout { display: flex; height: calc(100vh - 140px); gap: 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
 
@@ -452,7 +455,7 @@ function AskAI() {
                                 <Brain size={20} color="white" />
                             </div>
                             <div>
-                                <div className="aai-title">SujalPOS AI</div>
+                                <div className="aai-title">5ive AI</div>
                                 <div className="aai-subtitle">
                                     <span className={`aai-status-dot ${loading ? 'thinking' : ''}`}></span>
                                     {loading ? 'Analyzing...' : 'Online'}
@@ -481,7 +484,7 @@ function AskAI() {
                                 <div className="aai-welcome-icon">
                                     <Brain size={32} color="white" />
                                 </div>
-                                <div className="aai-welcome-title">Ask me anything</div>
+                                <div className="aai-welcome-title">5ive AI - Ask me anything</div>
                                 <div className="aai-welcome-sub">
                                     I'm your AI-powered restaurant co-pilot. Analyze sales, track inventory, manage orders, and get smart business insights.
                                 </div>
@@ -548,7 +551,7 @@ function AskAI() {
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 onKeyDown={handleKeyPress}
-                                placeholder="Ask about sales, inventory, orders, menu..."
+                                placeholder="Ask about sales, inventory, orders, or manage your menu..."
                                 className="aai-input"
                                 disabled={loading}
                             />

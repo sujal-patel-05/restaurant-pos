@@ -193,7 +193,7 @@ function Login() {
             }}>
                 <div style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <div style={{ fontSize: '1.5rem' }}>🤖</div>
-                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>SujalPOS AI</span>
+                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>5ive AI</span>
                 </div>
 
                 <div style={{ width: '100%', maxWidth: '420px' }}>

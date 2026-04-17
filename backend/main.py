@@ -37,6 +37,7 @@ app.add_middleware(
 os.makedirs("public/images/menu_items", exist_ok=True)
 os.makedirs("temp_audio", exist_ok=True)
 os.makedirs("static/invoices", exist_ok=True)
+os.makedirs("static/reports", exist_ok=True)
 
 # Mount static files
 app.mount("/public", StaticFiles(directory="public"), name="public")

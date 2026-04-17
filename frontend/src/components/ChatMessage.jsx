@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-    BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+    BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { Brain, User, Copy, Check } from 'lucide-react';
+import { Brain, User, Copy, Check, Download, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const CHART_COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316'];
+const CHART_COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316', '#ef4444'];
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function ChatMessage({ message }) {
     const isUser = message.role === 'user';
     const isAssistant = message.role === 'assistant';
     const [copied, setCopied] = useState(false);
+    const [chartIndex, setChartIndex] = useState(0);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(message.content);
@@ -20,17 +23,22 @@ function ChatMessage({ message }) {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const renderChart = () => {
-        if (!message.chartData) return null;
-        const { data, type, title, xKey, yKey } = message.chartData;
-        if (!data || data.length <= 1) return null;
+    // Get all charts from the response data
+    const allCharts = message.data?.all_charts || (message.chartData ? [message.chartData] : []);
+    const downloadUrl = message.data?.report_download_url;
 
-        const chartXKey = xKey || 'label';
-        const chartYKey = yKey || 'value';
+    const renderSingleChart = (chartData) => {
+        if (!chartData) return null;
+        const { data, type, title } = chartData;
+        // Support both naming conventions
+        const chartXKey = chartData.xKey || chartData.xAxisKey || 'label';
+        const chartYKey = chartData.yKey || chartData.dataKey || 'value';
+        const chartColor = chartData.color || '#6366f1';
+        if (!data || data.length <= 1) return null;
 
         return (
             <div style={{
-                marginTop: '14px', padding: '16px',
+                marginTop: '10px', padding: '16px',
                 background: 'rgba(0,0,0,0.15)', borderRadius: '12px',
                 border: '1px solid rgba(255,255,255,0.06)'
             }}>
@@ -50,8 +58,22 @@ function ChatMessage({ message }) {
                                 <XAxis dataKey={chartXKey} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
                                 <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', borderRadius: '10px', color: 'var(--text-main)', fontSize: 12 }} />
-                                <Line type="monotone" dataKey={chartYKey} stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} />
+                                <Line type="monotone" dataKey={chartYKey} stroke={chartColor} strokeWidth={2.5} dot={{ r: 3, fill: chartColor }} />
                             </LineChart>
+                        ) : type === 'area' ? (
+                            <AreaChart data={data} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id={`gradient-${chartColor.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={chartColor} stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor={chartColor} stopOpacity={0.02}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                                <XAxis dataKey={chartXKey} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 9 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', borderRadius: '10px', color: 'var(--text-main)', fontSize: 12 }} />
+                                <Area type="monotone" dataKey={chartYKey} stroke={chartColor} strokeWidth={2} fill={`url(#gradient-${chartColor.replace('#','')})`} dot={{ r: 3, fill: chartColor }} />
+                            </AreaChart>
                         ) : type === 'pie' ? (
                             <PieChart>
                                 <Pie
@@ -84,6 +106,122 @@ function ChatMessage({ message }) {
                     </ResponsiveContainer>
                 </div>
             </div>
+        );
+    };
+
+    const renderCharts = () => {
+        if (allCharts.length === 0) return null;
+
+        if (allCharts.length === 1) {
+            return renderSingleChart(allCharts[0]);
+        }
+
+        // Multi-chart carousel
+        const currentChart = allCharts[chartIndex];
+        return (
+            <div style={{ marginTop: '10px' }}>
+                {renderSingleChart(currentChart)}
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: '12px', marginTop: '8px',
+                }}>
+                    <button
+                        onClick={() => setChartIndex(Math.max(0, chartIndex - 1))}
+                        disabled={chartIndex === 0}
+                        style={{
+                            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px', padding: '4px 8px', cursor: chartIndex === 0 ? 'not-allowed' : 'pointer',
+                            color: 'var(--text-secondary)', opacity: chartIndex === 0 ? 0.3 : 0.8,
+                            display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+                        }}
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        {allCharts.map((_, i) => (
+                            <div
+                                key={i}
+                                onClick={() => setChartIndex(i)}
+                                style={{
+                                    width: i === chartIndex ? 18 : 6, height: 6,
+                                    borderRadius: 10, cursor: 'pointer',
+                                    background: i === chartIndex ? '#6366f1' : 'rgba(255,255,255,0.15)',
+                                    transition: 'all 0.3s',
+                                }}
+                            />
+                        ))}
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
+                        {chartIndex + 1}/{allCharts.length}
+                    </span>
+                    <button
+                        onClick={() => setChartIndex(Math.min(allCharts.length - 1, chartIndex + 1))}
+                        disabled={chartIndex === allCharts.length - 1}
+                        style={{
+                            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px', padding: '4px 8px',
+                            cursor: chartIndex === allCharts.length - 1 ? 'not-allowed' : 'pointer',
+                            color: 'var(--text-secondary)',
+                            opacity: chartIndex === allCharts.length - 1 ? 0.3 : 0.8,
+                            display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+                        }}
+                    >
+                        <ChevronRight size={14} />
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderDownloadButton = () => {
+        if (!downloadUrl) return null;
+        return (
+            <a
+                href={`${API_BASE}${downloadUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    marginTop: '12px', padding: '12px 16px',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))',
+                    border: '1px solid rgba(99,102,241,0.25)',
+                    borderRadius: '12px', textDecoration: 'none',
+                    color: '#a5b4fc', cursor: 'pointer',
+                    transition: 'all 0.25s',
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15))';
+                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))';
+                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}
+            >
+                <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                }}>
+                    <FileText size={18} color="white" />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#c4b5fd' }}>
+                        Download PDF Report
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.7, marginTop: 1 }}>
+                        Full report with charts & analytics
+                    </div>
+                </div>
+                <Download size={18} color="#818cf8" />
+            </a>
         );
     };
 
@@ -194,8 +332,11 @@ function ChatMessage({ message }) {
                         </ReactMarkdown>
                     </div>
 
-                    {/* Charts */}
-                    {renderChart()}
+                    {/* Charts (supports single + multi-chart carousel) */}
+                    {renderCharts()}
+
+                    {/* Download PDF Button */}
+                    {renderDownloadButton()}
                 </div>
 
                 {/* Copy button + Timestamp (assistant only) */}

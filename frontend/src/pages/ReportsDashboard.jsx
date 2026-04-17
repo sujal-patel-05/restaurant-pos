@@ -3,14 +3,15 @@ import { AppLayout } from '../components/AppLayout';
 import { reportsAPI } from '../services/api';
 import {
     LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-    Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart
+    Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart,
+    RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
 import {
     TrendingUp, TrendingDown, IndianRupee, ShoppingCart, Percent, Package,
     Clock, Utensils, AlertTriangle, Globe, Store, Smartphone,
     RefreshCw, Calendar, BarChart3, PieChart as PieChartIcon,
     Activity, Layers, CreditCard, Wallet, Banknote,
-    Flame, Award, Target, Zap, Eye, Download
+    Flame, Award, Target, Zap, Eye, Download, CheckCircle, BookOpen, FlaskConical, Trophy
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -174,12 +175,13 @@ function ReportsDashboard() {
     const [data, setData] = useState({
         sales: null, items: [], peakHours: [], ingredients: [], wastage: null,
         onlineVsOffline: null, forecast: null, dailyRevenue: [], categorySales: [], paymentMethods: [],
+        forecastBenchmark: null,
     });
 
     const fetchReports = useCallback(async () => {
         setLoading(true);
         try {
-            const [salesRes, itemsRes, peakRes, ingredientsRes, wastageRes, onlineRes, forecastRes, dailyRes, categoryRes, paymentRes] =
+            const [salesRes, itemsRes, peakRes, ingredientsRes, wastageRes, onlineRes, forecastRes, dailyRes, categoryRes, paymentRes, benchmarkRes] =
                 await Promise.all([
                     reportsAPI.getSalesReport(dateRange),
                     reportsAPI.getItemWiseSales(dateRange),
@@ -191,6 +193,7 @@ function ReportsDashboard() {
                     reportsAPI.getDailyRevenueTrend(dateRange),
                     reportsAPI.getCategorySales(dateRange),
                     reportsAPI.getPaymentMethods(dateRange),
+                    reportsAPI.getForecastBenchmark().catch(() => ({ data: null })),
                 ]);
             setData({
                 sales: salesRes.data,
@@ -203,6 +206,7 @@ function ReportsDashboard() {
                 dailyRevenue: dailyRes.data.trend || [],
                 categorySales: categoryRes.data.categories || [],
                 paymentMethods: paymentRes.data.methods || [],
+                forecastBenchmark: benchmarkRes.data,
             });
         } catch (err) {
             console.error('Reports fetch error:', err);
@@ -729,6 +733,57 @@ function ReportsDashboard() {
             ...(fc.historical || []).map(d => ({ ...d, date: d.date })),
             ...(fc.forecast || []).map(d => ({ ...d, date: d.date, revenue: undefined })),
         ];
+        const bm = data.forecastBenchmark;
+        const models = bm?.models || {};
+        const justification = bm?.justification || null;
+        const dataSummary = bm?.data_summary || null;
+
+        // Build radar data for model comparison
+        const radarData = (() => {
+            if (!models.prophet) return [];
+            const modelKeys = ['prophet', 'polynomial', 'holt_winters', 'naive_seasonal'];
+            const maxMape = Math.max(...modelKeys.map(k => models[k]?.in_sample?.mape || 100));
+            const maxRmse = Math.max(...modelKeys.map(k => models[k]?.in_sample?.rmse || 10000));
+            const maxMae = Math.max(...modelKeys.map(k => models[k]?.in_sample?.mae || 10000));
+            return [
+                {
+                    metric: 'Accuracy (1-MAPE)',
+                    prophet: Math.max(0, 100 - (models.prophet?.in_sample?.mape || 100)),
+                    polynomial: Math.max(0, 100 - (models.polynomial?.in_sample?.mape || 100)),
+                    holt_winters: Math.max(0, 100 - (models.holt_winters?.in_sample?.mape || 100)),
+                    naive: Math.max(0, 100 - (models.naive_seasonal?.in_sample?.mape || 100)),
+                },
+                {
+                    metric: 'R² Score',
+                    prophet: Math.max(0, (models.prophet?.in_sample?.r_squared || 0) * 100),
+                    polynomial: Math.max(0, (models.polynomial?.in_sample?.r_squared || 0) * 100),
+                    holt_winters: Math.max(0, (models.holt_winters?.in_sample?.r_squared || 0) * 100),
+                    naive: Math.max(0, (models.naive_seasonal?.in_sample?.r_squared || 0) * 100),
+                },
+                {
+                    metric: 'Low Error (RMSE)',
+                    prophet: maxRmse > 0 ? Math.max(0, (1 - (models.prophet?.in_sample?.rmse || 0) / maxRmse) * 100) : 0,
+                    polynomial: maxRmse > 0 ? Math.max(0, (1 - (models.polynomial?.in_sample?.rmse || 0) / maxRmse) * 100) : 0,
+                    holt_winters: maxRmse > 0 ? Math.max(0, (1 - (models.holt_winters?.in_sample?.rmse || 0) / maxRmse) * 100) : 0,
+                    naive: maxRmse > 0 ? Math.max(0, (1 - (models.naive_seasonal?.in_sample?.rmse || 0) / maxRmse) * 100) : 0,
+                },
+                {
+                    metric: 'Precision (MAE)',
+                    prophet: maxMae > 0 ? Math.max(0, (1 - (models.prophet?.in_sample?.mae || 0) / maxMae) * 100) : 0,
+                    polynomial: maxMae > 0 ? Math.max(0, (1 - (models.polynomial?.in_sample?.mae || 0) / maxMae) * 100) : 0,
+                    holt_winters: maxMae > 0 ? Math.max(0, (1 - (models.holt_winters?.in_sample?.mae || 0) / maxMae) * 100) : 0,
+                    naive: maxMae > 0 ? Math.max(0, (1 - (models.naive_seasonal?.in_sample?.mae || 0) / maxMae) * 100) : 0,
+                },
+            ];
+        })();
+
+        const MODEL_COLORS = {
+            prophet: '#6366F1',
+            polynomial: '#F59E0B',
+            holt_winters: '#EC4899',
+            naive: '#94A3B8',
+        };
+
         return (
             <>
                 <div style={S.kpiGrid}>
@@ -798,6 +853,169 @@ function ReportsDashboard() {
                             </table>
                         </div>
                     </div>
+                )}
+
+                {/* ═══════════ MODEL JUSTIFICATION PANEL ═══════════ */}
+                {bm && models.prophet && (
+                    <>
+                        {/* Section Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0.5rem 0' }}>
+                            <div style={{ height: 2, flex: 1, background: 'linear-gradient(90deg, var(--primary), transparent)' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '20px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.5px' }}>
+                                <FlaskConical size={16} /> Model Comparison & Justification
+                            </div>
+                            <div style={{ height: 2, flex: 1, background: 'linear-gradient(90deg, transparent, var(--primary))' }} />
+                        </div>
+
+                        {/* Cross-Validation KPIs */}
+                        {models.prophet?.cross_validation && (
+                            <div style={S.kpiGrid}>
+                                <KPICard label="CV MAPE" value={`${models.prophet.cross_validation.mape_mean}%`} icon={<Target size={18} />} iconBg="#DBEAFE" iconColor="#3B82F6" subtitle={`± ${models.prophet.cross_validation.mape_std}% std`} />
+                                <KPICard label="CV Folds" value={models.prophet.cross_validation.folds} icon={<Layers size={18} />} iconBg="#EDE9FE" iconColor="#8B5CF6" subtitle="Rolling 7-day windows" />
+                                <KPICard label="CV Coverage" value={models.prophet.cross_validation.coverage ? `${models.prophet.cross_validation.coverage}%` : 'N/A'} icon={<CheckCircle size={18} />} iconBg="var(--success-bg)" iconColor="var(--success)" subtitle="Calibrated intervals" />
+                                <KPICard label="Training Data" value={`${dataSummary?.days || 0} days`} icon={<Calendar size={18} />} iconBg="var(--warning-bg)" iconColor="var(--warning)" subtitle={`₹${(dataSummary?.total_revenue || 0).toLocaleString()} total`} />
+                            </div>
+                        )}
+
+                        {/* Radar Chart + Comparison Table */}
+                        <div style={S.chartGrid2}>
+                            {/* Radar Chart */}
+                            <div style={S.chartCard}>
+                                <div>
+                                    <div style={S.chartTitle}><FlaskConical size={18} style={{ color: '#8B5CF6' }} /> Multi-Metric Comparison</div>
+                                    <div style={S.chartSubtitle}>Higher = better across all axes (normalized 0-100)</div>
+                                </div>
+                                <div style={{ height: 340 }}>
+                                    {radarData.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+                                                <PolarGrid stroke="var(--border-color)" />
+                                                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                                                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9, fill: 'var(--text-secondary)' }} />
+                                                <Radar name="Prophet" dataKey="prophet" stroke="#6366F1" fill="#6366F1" fillOpacity={0.25} strokeWidth={2.5} dot={{ r: 4, fill: '#6366F1' }} />
+                                                <Radar name="Polynomial" dataKey="polynomial" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.08} strokeWidth={1.5} strokeDasharray="4 3" />
+                                                <Radar name="Holt-Winters" dataKey="holt_winters" stroke="#EC4899" fill="#EC4899" fillOpacity={0.08} strokeWidth={1.5} strokeDasharray="4 3" />
+                                                <Radar name="Naïve" dataKey="naive" stroke="#94A3B8" fill="#94A3B8" fillOpacity={0.05} strokeWidth={1.5} strokeDasharray="4 3" />
+                                                <Legend wrapperStyle={{ fontSize: '0.78rem', paddingTop: '10px' }} />
+                                                <Tooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', fontSize: '0.8rem' }} />
+                                            </RadarChart>
+                                        </ResponsiveContainer>
+                                    ) : <EmptyState msg="Run train_prophet.py for comparison" />}
+                                </div>
+                            </div>
+
+                            {/* Comparison Table */}
+                            <div style={S.chartCard}>
+                                <div>
+                                    <div style={S.chartTitle}><BarChart3 size={18} style={{ color: '#6366F1' }} /> Model Benchmark Results</div>
+                                    <div style={S.chartSubtitle}>In-sample metrics across all 4 candidate models</div>
+                                </div>
+                                <div style={S.tableWrap}>
+                                    <table style={S.table}>
+                                        <thead>
+                                            <tr>
+                                                <th style={S.th}>Model</th>
+                                                <th style={{ ...S.th, textAlign: 'right' }}>MAPE ↓</th>
+                                                <th style={{ ...S.th, textAlign: 'right' }}>RMSE ↓</th>
+                                                <th style={{ ...S.th, textAlign: 'right' }}>R² ↑</th>
+                                                <th style={{ ...S.th, textAlign: 'right' }}>MAE ↓</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[
+                                                { key: 'prophet', color: '#6366F1' },
+                                                { key: 'holt_winters', color: '#EC4899' },
+                                                { key: 'polynomial', color: '#F59E0B' },
+                                                { key: 'naive_seasonal', color: '#94A3B8' },
+                                            ].map(({ key, color }) => {
+                                                const m = models[key];
+                                                if (!m) return null;
+                                                const isWinner = justification?.winner === key;
+                                                return (
+                                                    <tr key={key} style={{ transition: 'background 0.15s', background: isWinner ? 'rgba(99,102,241,0.06)' : '' }}
+                                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-body)'}
+                                                        onMouseLeave={e => e.currentTarget.style.background = isWinner ? 'rgba(99,102,241,0.06)' : ''}
+                                                    >
+                                                        <td style={{ ...S.td, fontWeight: 700 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                                                                {m.name}
+                                                                {isWinner && <span style={{ padding: '2px 8px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px' }}>🏆 BEST</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: isWinner ? 'var(--success)' : 'var(--text-main)' }}>{m.in_sample?.mape}%</td>
+                                                        <td style={{ ...S.td, textAlign: 'right' }}>₹{m.in_sample?.rmse?.toLocaleString()}</td>
+                                                        <td style={{ ...S.td, textAlign: 'right', fontWeight: 600 }}>{m.in_sample?.r_squared}</td>
+                                                        <td style={{ ...S.td, textAlign: 'right' }}>₹{m.in_sample?.mae?.toLocaleString()}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {/* Metric Legend */}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                    <span>↓ = lower is better</span>
+                                    <span>↑ = higher is better</span>
+                                    <span>|</span>
+                                    <span><b>MAPE</b> = Mean Absolute Percentage Error</span>
+                                    <span><b>RMSE</b> = Root Mean Squared Error</span>
+                                    <span><b>R²</b> = Coefficient of Determination</span>
+                                    <span><b>MAE</b> = Mean Absolute Error</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Academic Justification */}
+                        {justification && (
+                            <div style={{ ...S.chartFull, background: 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(139,92,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 'var(--radius-lg)', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff', flexShrink: 0 }}>
+                                        <BookOpen size={22} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', fontFamily: 'var(--font-heading)' }}>
+                                            Why {justification.winner_name}? — Academic Justification
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Statistical evidence for model selection</div>
+                                    </div>
+                                    <div style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: '20px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Trophy size={14} /> Winner: {justification.winner_name}
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '8px' }}>
+                                    {justification.reasons?.map((reason, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-color)' }}>
+                                            <CheckCircle size={16} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} />
+                                            <div style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'var(--text-main)' }}>{reason}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Prophet vs Alternatives Quick Stats */}
+                                {justification.prophet_vs_alternatives && (
+                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', paddingTop: '8px' }}>
+                                        {Object.entries(justification.prophet_vs_alternatives).map(([key, val]) => (
+                                            <div key={key} style={{ flex: '1 1 180px', padding: '12px 16px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>vs {key.replace(/_/g, ' ')}</div>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: val.percentage_improvement > 0 ? 'var(--success)' : 'var(--error)', fontFamily: 'var(--font-heading)' }}>{val.percentage_improvement > 0 ? '+' : ''}{val.percentage_improvement}%</div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{val.mape_difference > 0 ? `${val.mape_difference}% lower MAPE` : 'similar'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Academic Citation */}
+                                {justification.academic_note && (
+                                    <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(99,102,241,0.06)', borderLeft: '3px solid #6366F1', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>📚 Academic Reference</div>
+                                        <div style={{ fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-main)', fontStyle: 'italic' }}>{justification.academic_note}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </>
         );

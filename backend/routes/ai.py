@@ -19,39 +19,158 @@ def chat(
 ):
     """
     Main chat endpoint for Ask-AI chatbot
-    Handles user messages, classifies intent, executes queries, and generates responses
+    Handles user messages, classifies intent, executes queries, and generates responses.
+    
+    Supports smart follow-up flows:
+    - "Change price of coke" → AI asks for new price → User types "100" → Price updated instantly
+    - "Remove samosa" → AI asks for confirmation → User types "yes" → Item removed
     """
     try:
         ai_service = get_ai_service()
         
         # Generate conversation ID if not provided
         conversation_id = request.conversation_id or str(uuid.uuid4())
+        restaurant_id_str = str(current_user.restaurant_id)
+        user_id_str = str(current_user.id)
         
-        # Classify intent
+        # ═══════════════════════════════════════════════════════════
+        # STEP 0: Check for pending follow-up actions FIRST
+        # This is what makes "100" resolve to a price update instantly
+        # ═══════════════════════════════════════════════════════════
+        resolved = ai_service.resolve_pending_action(
+            conversation_id, request.message, db, restaurant_id_str, user_id_str
+        )
+        
+        if resolved:
+            # Follow-up was resolved! Use the result directly
+            intent_type = resolved['intent_type']
+            data = resolved['data']
+            intent = Intent(
+                intent_type=intent_type,
+                confidence=1.0,
+                entities={},
+                needs_data=True
+            )
+            
+            # Generate response from the resolved action data
+            response_message, chart_data = ai_service.generate_response(
+                request.message, intent, data, conversation_id
+            )
+            
+            # Store conversation history
+            from schemas.ai_schemas import ChatMessage
+            ai_service.add_to_conversation(
+                conversation_id,
+                ChatMessage(role="user", content=request.message),
+                restaurant_id_str, user_id_str
+            )
+            ai_service.add_to_conversation(
+                conversation_id,
+                ChatMessage(role="assistant", content=response_message),
+                restaurant_id_str, user_id_str
+            )
+            
+            return ChatResponse(
+                message=response_message,
+                intent=intent,
+                data=data,
+                chart_data=chart_data,
+                conversation_id=conversation_id,
+                timestamp=datetime.utcnow()
+            )
+        
+        # ═══════════════════════════════════════════════════════════
+        # STEP 1: Normal intent classification
+        # ═══════════════════════════════════════════════════════════
         intent = ai_service.classify_intent(request.message)
+        
+        # ═══════════════════════════════════════════════════════════
+        # STEP 1.5: Multi-Operation Handling
+        # If the classifier detects a compound command, decompose
+        # and execute all operations before generating response
+        # ═══════════════════════════════════════════════════════════
+        if intent.intent_type == "multi_operation":
+            try:
+                multi_result = ai_service.execute_multi_operation(
+                    request.message, db, restaurant_id_str, user_id_str
+                )
+                
+                if multi_result:
+                    data = multi_result
+                    response_message = multi_result.get('message', 'Operations completed.')
+                    chart_data = None
+                    
+                    # Use LLM to polish the response if available
+                    if ai_service.use_llm and ai_service.llm_service:
+                        try:
+                            conversation_history = ai_service.get_conversation(
+                                conversation_id, restaurant_id_str, user_id_str
+                            ) if conversation_id else []
+                            llm_response = ai_service.llm_service.generate_intelligent_response(
+                                request.message, "multi_operation", multi_result, conversation_history
+                            )
+                            if llm_response:
+                                response_message = llm_response
+                        except Exception:
+                            pass  # Fall back to template response
+                    
+                    # Store conversation history
+                    from schemas.ai_schemas import ChatMessage
+                    ai_service.add_to_conversation(
+                        conversation_id,
+                        ChatMessage(role="user", content=request.message),
+                        restaurant_id_str, user_id_str
+                    )
+                    ai_service.add_to_conversation(
+                        conversation_id,
+                        ChatMessage(role="assistant", content=response_message),
+                        restaurant_id_str, user_id_str
+                    )
+                    
+                    return ChatResponse(
+                        message=response_message,
+                        intent=intent,
+                        data=data,
+                        chart_data=chart_data,
+                        conversation_id=conversation_id,
+                        timestamp=datetime.utcnow()
+                    )
+            except Exception as e:
+                print(f"Multi-operation error: {e}")
+                import traceback
+                traceback.print_exc()
+                # Fall through to normal single-intent handling
         
         # Execute action or query
         data = None
         if intent.needs_data:
             try:
                 # Check if this is an action-based intent
-                if intent.intent_type == "create_order":
+                ACTION_INTENTS = {"create_order", "update_menu_item", "add_menu_item", "delete_menu_item"}
+                if intent.intent_type in ACTION_INTENTS:
                     from services.action_engine import get_action_engine
                     action_engine = get_action_engine()
                     data = action_engine.execute_action(
                         intent.intent_type,
                         intent.entities,
                         db,
-                        str(current_user.restaurant_id),
-                        str(current_user.id)
+                        restaurant_id_str,
+                        user_id_str
                     )
+                    
+                    # ═══════════════════════════════════════════════
+                    # STEP 2: If action returned pending, store it
+                    # so the NEXT message can resolve it instantly
+                    # ═══════════════════════════════════════════════
+                    if data and data.get('pending'):
+                        ai_service.set_pending_action(conversation_id, data)
                 else:
                     # Query-based intent
                     data = QueryEngine.execute_query(
                         intent.intent_type,
                         intent.entities,
                         db,
-                        str(current_user.restaurant_id)
+                        restaurant_id_str
                     )
             except Exception as e:
                 print(f"Query/Action execution error: {e}")
@@ -69,9 +188,6 @@ def chat(
         
         # Store in conversation history
         from schemas.ai_schemas import ChatMessage
-        
-        restaurant_id_str = str(current_user.restaurant_id)
-        user_id_str = str(current_user.id)
         
         ai_service.add_to_conversation(
             conversation_id,

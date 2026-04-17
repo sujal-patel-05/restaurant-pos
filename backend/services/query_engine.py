@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from models import Order, MenuItem, Ingredient, OrderItem, WastageLog, OrderStatus
 from sqlalchemy import func, and_
 from services.revenue_intelligence_service import RevenueIntelligenceService
+import os
 
 class QueryEngine:
     """
@@ -35,6 +36,8 @@ class QueryEngine:
             return QueryEngine._query_wastage(entities, db, restaurant_id)
         elif intent_type == "revenue_intel":
             return QueryEngine._query_revenue_intelligence(entities, db, restaurant_id)
+        elif intent_type == "generate_report":
+            return QueryEngine._query_generate_report(entities, db, restaurant_id)
         
         return {}
     
@@ -131,6 +134,14 @@ class QueryEngine:
                 "xAxisKey": "name"
             }
             
+        # Calculate the most frequent top selling item from history
+        best_seller_all_time = None
+        if recent_summaries:
+            from collections import Counter
+            top_items = [s.top_selling_item for s in recent_summaries if s.top_selling_item]
+            if top_items:
+                best_seller_all_time = Counter(top_items).most_common(1)[0][0]
+
         return {
             "total_revenue": float(total_revenue) if total_revenue else 0.0,
             "total_orders": total_orders,
@@ -138,6 +149,7 @@ class QueryEngine:
             "yesterday": yesterday_data,
             "last_7_days": {"revenue": week_revenue, "orders": week_orders},
             "last_30_days": {"revenue": month_revenue, "orders": month_orders},
+            "best_selling_item_all_time": best_seller_all_time,
             "daily_history": history[:14],  # Last 14 days for context
             "chart_data": chart_info
         }
@@ -352,3 +364,47 @@ class QueryEngine:
         
         # Default: Full Report
         return RevenueIntelligenceService.get_full_report(db, restaurant_id, days)
+
+    @staticmethod
+    def _query_generate_report(entities: Dict[str, Any], db: Session, restaurant_id: str) -> Dict[str, Any]:
+        """Generate a comprehensive sales report with charts and downloadable PDF."""
+        from services.sales_report_generator import SalesReportGenerator
+        from services.report_pdf_service import ReportPDFService
+        from models import Restaurant
+
+        report_type = entities.get("report_type", "monthly")
+        days = entities.get("days", None)
+
+        # Map report types to day counts if not specified
+        if days is None:
+            days = {"daily": 1, "weekly": 7, "monthly": 30, "quarterly": 90}.get(report_type, 30)
+
+        # Generate report data
+        report_data = SalesReportGenerator.generate(
+            db=db,
+            restaurant_id=restaurant_id,
+            report_type=report_type,
+            days=days,
+        )
+
+        # Get restaurant name for PDF header
+        restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+        r_name = restaurant.name if restaurant else "Restaurant"
+
+        # Generate PDF
+        try:
+            pdf_path = ReportPDFService.generate_pdf(report_data, restaurant_name=r_name)
+            # Convert file path to download URL
+            report_data["report_download_url"] = f"/static/reports/{os.path.basename(pdf_path)}"
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"PDF generation failed: {e}")
+            report_data["report_download_url"] = None
+            report_data["pdf_error"] = str(e)
+
+        # Include chart_data for frontend inline rendering (use the first chart as primary)
+        if report_data.get("charts"):
+            report_data["chart_data"] = report_data["charts"][0]
+            report_data["all_charts"] = report_data["charts"]
+
+        return report_data
